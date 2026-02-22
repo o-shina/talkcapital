@@ -21,6 +21,11 @@ export interface Config {
   output: {
     scale: number;
   };
+  streaming?: {
+    port: number;
+    updateChars: number;
+    maxSessions: number;
+  };
 }
 
 let loaded = false;
@@ -75,6 +80,11 @@ export function loadConfig(): Config {
         : undefined,
     output: {
       scale: Number(process.env.OUTPUT_SCALE ?? '2'),
+    },
+    streaming: {
+      port: Number(process.env.PORT ?? '8080'),
+      updateChars: Number(process.env.STREAMING_UPDATE_CHARS ?? '500'),
+      maxSessions: Number(process.env.STREAMING_MAX_SESSIONS ?? '1'),
     },
   };
 }

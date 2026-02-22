@@ -15,6 +15,10 @@ npx playwright install chromium
 cp .env.example .env
 ```
 
+前提:
+- Node.js 20 以上
+- AWS 認証情報（`AWS_PROFILE` または環境変数）を事前設定
+
 `.env` 設定例:
 ```env
 AWS_REGION=ap-northeast-1
@@ -29,6 +33,38 @@ OUTPUT_SCALE=2
 - `s3:PutObject`, `s3:GetObject`
 - `transcribe:StartTranscriptionJob`, `transcribe:GetTranscriptionJob`
 - `bedrock:Converse`
+
+最小ポリシー例:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::<YOUR_BUCKET>/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "transcribe:StartTranscriptionJob",
+        "transcribe:GetTranscriptionJob"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:Converse"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
 
 ## 使い方
 ```bash
@@ -50,6 +86,10 @@ npx talkcapital generate --skip-transcribe --transcript test/fixtures/sample-tra
 - `--format <png|excalidraw>`: 出力形式（デフォルト: `png`）
 - `--scale <number>`: 出力スケール（デフォルト2）
 - `--verbose`: 詳細ログ
+
+実行ログ:
+- 主要ステージ（`[1/4]` から `[4/4]`）は常時表示
+- `--verbose` は将来の詳細デバッグログ拡張用フラグ
 
 ## 開発
 ```bash

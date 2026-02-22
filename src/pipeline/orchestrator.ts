@@ -29,34 +29,31 @@ export async function runPipeline(options: PipelineOptions, config: Config): Pro
 
   let transcript: string;
   if (options.transcriptOverride) {
-    log('[1/4] 文字起こしスキップ: 既存ファイルを読み込み', options.verbose);
+    logStage('[1/4] 文字起こしスキップ: 既存ファイルを読み込み');
     transcript = await readFile(options.transcriptOverride, 'utf8');
     timings.transcription = Date.now() - stageStart;
   } else {
     if (!options.inputAudioPath) {
       throw new Error('--input または --skip-transcribe + --transcript を指定してください');
     }
-    log('[1/4] Transcribe 実行中...', options.verbose);
+    logStage('[1/4] Transcribe 実行中...');
     const started = Date.now();
     transcript = await transcribeAudio(options.inputAudioPath, config);
     timings.transcription = Date.now() - started;
   }
 
-  log('[2/4] Bedrock 構造化中...', options.verbose);
+  logStage('[2/4] Bedrock 構造化中...');
   const structureStarted = Date.now();
   const structured = await structureTranscript(transcript, config);
   timings.structuring = Date.now() - structureStarted;
 
-  log('[3/4] テンプレート描画中...', options.verbose);
+  logStage('[3/4] テンプレート描画中...');
   const templateStarted = Date.now();
   const excalidrawDoc = renderToExcalidraw(structured);
   timings.template = Date.now() - templateStarted;
 
   const outputFormat = options.outputFormat ?? 'png';
-  log(
-    `[4/4] ${outputFormat === 'png' ? 'PNG エクスポート' : 'Excalidraw JSON 保存'} 中...`,
-    options.verbose,
-  );
+  logStage(`[4/4] ${outputFormat === 'png' ? 'PNG エクスポート' : 'Excalidraw JSON 保存'} 中...`);
   const exportStarted = Date.now();
   if (outputFormat === 'png') {
     await exportToPng(excalidrawDoc, options.outputPath, options.scale ?? config.output.scale);
@@ -73,8 +70,6 @@ export async function runPipeline(options: PipelineOptions, config: Config): Pro
   };
 }
 
-function log(message: string, verbose = false): void {
-  if (verbose) {
-    process.stdout.write(`${message}\n`);
-  }
+function logStage(message: string): void {
+  process.stdout.write(`${message}\n`);
 }

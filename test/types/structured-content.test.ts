@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import sampleStructured from '../fixtures/sample-structured.json';
+import sampleStructured from '../fixtures/sample-structured.json' with { type: 'json' };
 import {
   getStructuredContentJsonSchema,
   structuredContentSchema,

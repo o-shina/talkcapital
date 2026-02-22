@@ -42,7 +42,8 @@
 ## 進捗ログ
 - [x] M1: 設定モデル拡張（`LLM_PROVIDER`とOpenRouter環境変数）
   - 変更: `src/config/index.ts` に provider切替とOpenRouter必須値の検証を追加
-- [ ] M2: 構造化サービスのプロバイダー分岐実装
+- [x] M2: 構造化サービスのプロバイダー分岐実装
+  - 変更: `src/services/structuring.ts` に Bedrock/OpenRouter分岐とOpenRouterリトライ実装を追加
 - [ ] M3: テスト・README・.env.example更新とローカル検証
 - [ ] M4: PR作成・CI確認・mainマージ
 

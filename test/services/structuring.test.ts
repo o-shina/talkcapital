@@ -150,4 +150,16 @@ describe('structuring service', () => {
     expect(result.actions).toHaveLength(3);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
+
+  test('openrouterがHTTPエラーを返したら失敗する', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
+
+    await expect(
+      structureTranscript('transcript', openRouterConfig, { fetchImpl: fetchImpl as any }),
+    ).rejects.toThrow('OpenRouter API error: 503');
+  });
 });

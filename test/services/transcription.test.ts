@@ -67,4 +67,36 @@ describe('transcription service', () => {
       }),
     ).rejects.toThrow('Transcribeジョブ失敗');
   });
+
+  test('異常系: 文字起こし結果取得がHTTPエラーなら失敗', async () => {
+    const transcribeSend = vi
+      .fn()
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        TranscriptionJob: {
+          TranscriptionJobStatus: 'COMPLETED',
+          Transcript: { TranscriptFileUri: 'https://example.com/result.json' },
+        },
+      });
+
+    await expect(
+      transcribeAudio(audioPath, config, {
+        s3Client: { send: vi.fn().mockResolvedValue({}) } as any,
+        transcribeClient: { send: transcribeSend } as any,
+        wait: async () => undefined,
+        fetchImpl: vi.fn().mockResolvedValue({ ok: false, status: 500 }) as any,
+      }),
+    ).rejects.toThrow('文字起こし結果の取得に失敗しました');
+  });
+
+  test('異常系: ジョブタイムアウトで失敗', async () => {
+    await expect(
+      transcribeAudio(audioPath, config, {
+        s3Client: { send: vi.fn().mockResolvedValue({}) } as any,
+        transcribeClient: { send: vi.fn().mockResolvedValue({}) } as any,
+        wait: async () => undefined,
+        now: vi.fn().mockReturnValueOnce(0).mockReturnValue(301000),
+      }),
+    ).rejects.toThrow('Transcribeジョブがタイムアウトしました');
+  });
 });

@@ -41,7 +41,9 @@
 - [x] M1: 現状確認とCI定義の修正
   - 実行: `sed -n '1,220p' .github/workflows/ci.yml`
   - 変更: `Build` ステップ（`npm run build`）を追加
-- [ ] M2: ローカル検証（build/lint/test）
+- [x] M2: ローカル検証（build/lint/test）
+  - 実行: `npm run build && npm run lint && npm run test`
+  - 要点: build/lint/test すべて成功（7 test files / 15 tests passed）
 - [ ] M3: PR作成・CI確認・mainマージ
 
 ## ネットワーク復旧後の手順

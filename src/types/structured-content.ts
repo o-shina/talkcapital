@@ -42,6 +42,47 @@ export const structuredContentSchema = z.object({
 
 export type StructuredContent = z.infer<typeof structuredContentSchema>;
 
+// ストリーミング中間スキーマ（途中テキスト前提で制約を緩和）
+export const interimStructuredContentSchema = z.object({
+  title: z.string().min(1).max(30),
+  mainMessage: mediumText,
+  blocks: z
+    .array(
+      z.object({
+        heading: shortText,
+        bullets: z
+          .array(
+            z.object({
+              text: shortText,
+            }),
+          )
+          .min(1)
+          .max(3),
+      }),
+    )
+    .min(1)
+    .max(4),
+  speechBubbles: z
+    .array(
+      z.object({
+        quote: shortText,
+        emphasis: z.enum(['important', 'surprising', 'humorous', 'inspiring']).optional(),
+      }),
+    )
+    .min(0)
+    .max(4),
+  actions: z
+    .array(
+      z.object({
+        text: shortText,
+      }),
+    )
+    .min(0)
+    .max(3),
+});
+
+export type InterimStructuredContent = z.infer<typeof interimStructuredContentSchema>;
+
 export function getStructuredContentJsonSchema(): Record<string, unknown> {
   return {
     type: 'object',

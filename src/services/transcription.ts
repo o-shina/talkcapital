@@ -16,6 +16,7 @@ export interface TranscriptionDependencies {
   transcribeClient?: Pick<TranscribeClient, 'send'>;
   wait?: (ms: number) => Promise<void>;
   fetchImpl?: typeof fetch;
+  now?: () => number;
 }
 
 export async function transcribeAudio(
@@ -38,6 +39,7 @@ export async function transcribeAudio(
     deps.transcribeClient ?? new TranscribeClient({ region: config.aws.region });
   const wait = deps.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const fetchImpl = deps.fetchImpl ?? fetch;
+  const now = deps.now ?? (() => Date.now());
 
   await s3Client.send(
     new PutObjectCommand({
@@ -60,8 +62,8 @@ export async function transcribeAudio(
     }),
   );
 
-  const timeoutAt = Date.now() + 5 * 60 * 1000;
-  while (Date.now() < timeoutAt) {
+  const timeoutAt = now() + 5 * 60 * 1000;
+  while (now() < timeoutAt) {
     const jobResult = await transcribeClient.send(
       new GetTranscriptionJobCommand({ TranscriptionJobName: jobName }),
     );

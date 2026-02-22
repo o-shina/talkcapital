@@ -41,7 +41,9 @@
   - 対象: transcription（HTTP失敗/タイムアウト）, structuring（OpenRouter HTTP失敗）, exporter（レンダリング失敗時close）
 - [x] M2: 異常系テスト実装（transcription/structuring/exporter）
   - 変更: `test/services/transcription.test.ts`, `test/services/structuring.test.ts`, `test/services/exporter.test.ts`
-- [ ] M3: ローカル検証（build/lint/test）
+- [x] M3: ローカル検証（build/lint/test）
+  - 実行: `npm run build && npm run lint && npm run test`
+  - 要点: build/lint/test すべて成功（7 test files / 23 tests passed）
 - [ ] M4: PR作成・CI確認・mainマージ
 
 ## ネットワーク復旧後の手順

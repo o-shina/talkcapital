@@ -90,17 +90,13 @@ describe('transcription service', () => {
   });
 
   test('異常系: ジョブタイムアウトで失敗', async () => {
-    const nowSpy = vi.spyOn(Date, 'now');
-    nowSpy.mockReturnValueOnce(0).mockReturnValue(301000);
-
     await expect(
       transcribeAudio(audioPath, config, {
         s3Client: { send: vi.fn().mockResolvedValue({}) } as any,
         transcribeClient: { send: vi.fn().mockResolvedValue({}) } as any,
         wait: async () => undefined,
+        now: vi.fn().mockReturnValueOnce(0).mockReturnValue(301000),
       }),
     ).rejects.toThrow('Transcribeジョブがタイムアウトしました');
-
-    nowSpy.mockRestore();
   });
 });

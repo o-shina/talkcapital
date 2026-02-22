@@ -3,125 +3,189 @@
 あなたは AGENTS.md と .agent/PLANS.md を最優先のルールとして厳守してください。
 
 # 現在の状態（重要：最初に読むこと）
-前回のCodex実行で基本実装は完了済み。現在のブランチ: feature/1-bootstrap-20260222（GitHubにpush済み）
+MVP（バッチCLI）は完成済み。全Issueクローズ、全PRマージ済み。
+これからストリーミングモードを追加する。
 
-## 完了済みの内容
-- 全ソースコード実装済み（src/, test/, export/）
+## リポジトリ状態
+- デフォルトブランチ: `main`（最新、全PRマージ済み）
 - 依存パッケージインストール済み（node_modules/ あり）
-- `npm run build` → 成功
-- `npm run lint` → 成功
-- `npm run test` → 全14テスト合格
-- GitHub Actions CI設定済み（.github/workflows/ci.yml）
-- ブランチ feature/1-bootstrap-20260222 は origin に push 済み
+- `npm run build && npm run lint && npm run test` → 全23テスト合格
+- GitHub Actions CI: build → lint → test 実行（green）
 
-## 残タスク（あなたがやること）
-1. コード品質の改善（下記「改善ポイント」参照）
-2. 改善内容のコミットとpush
-3. GitHub Issue の作成（改善タスクごと）
-4. Pull Request の作成（feature/1-bootstrap-20260222 → main）
-5. CI green 確認
-
-## 既知の改善ポイント
-- export/index.html が独自Canvas2Dレンダラーで手書き風(Rough.js)が効いていない。設計ではPlaywright + @excalidraw/excalidraw 公式レンダラーを使う想定だったが、MVPとしては現状で許容可。改善Issueとして積む
-- orchestrator.ts の進捗表示が verbose=true 時のみ表示される。デフォルトでも主要ステージ表示すべき
-- README.md にセットアップ手順・必要なAWS権限・使い方が書かれているか確認し、不足があれば補完
+## 実装済みの機能（変更しない）
+- CLI: `npx talkcapital generate --input lecture.m4a --output output.png`
+- パイプライン: Audio → S3 → Transcribe batch → Bedrock Claude → Excalidraw JSON → PNG
+- サービス: transcription, structuring, template-engine, exporter
+- テスト: 23件（全モック化）
+- Excalidraw公式レンダラー（export/index.html）
+- OpenRouter対応（LLM_PROVIDER=bedrock|openrouter）
 
 # ミッション
-前回実行で作成済みの MVP コードを改善し、GitHub 上で PR を作成・マージ可能な状態にする。
-主な作業: コード品質改善、Issue作成、PR作成、CI確認。
+TalkCapitalに**ストリーミングモード**を追加する。
+講演中にリアルタイム文字起こしし、一定の区切りでグラレコPNGを更新、講演終了時に最終版を生成するWebサービス。
+
+## アーキテクチャ概要
+```
+ブラウザ (マイク) → PCM 16kHz via WebSocket → Node.js サーバー
+  ├→ Amazon Transcribe Streaming（リアルタイム文字起こし）
+  │    └→ 確定テキスト蓄積
+  ├→ 500文字蓄積ごとに:
+  │    Bedrock構造化 → Excalidraw JSON → PNG → WebSocketでブラウザに送信
+  └→ 講演終了時:
+       全文字起こし → Bedrock最終構造化 → 最終版PNG
+```
+
+# 実装フェーズ（9フェーズ、この順で実装する）
+
+## Phase 0: 依存パッケージ追加 [S]
+- `npm install @aws-sdk/client-transcribe-streaming ws express`
+- `npm install -D @types/ws @types/express`
+- `package.json` の scripts に `"serve": "node dist/server.js"` を追加
+- `npm run build && npm run lint && npm run test` が引き続き成功すること
+
+## Phase 1: 型定義 [S]
+- `src/types/structured-content.ts` に `interimStructuredContentSchema` を追加
+  - blocks min(1), speechBubbles min(0), actions min(0).max(3)
+  - 既存の `structuredContentSchema` は変更しない
+- `src/types/ws-messages.ts` を新規作成（WebSocketメッセージ型定義）
+
+## Phase 2: Transcribe Streaming ラッパー [M]
+- `src/streaming/transcribe-stream.ts` を新規作成
+  - `@aws-sdk/client-transcribe-streaming` の `StartStreamTranscriptionCommand` を使用
+  - PCMチャンクを `PassThrough` ストリーム経由でTranscribeに供給
+  - partial/final results をEventEmitterで通知
+  - 10秒間隔で無音チャンク送信（15秒タイムアウト防止）
+- `test/streaming/transcribe-stream.test.ts` を新規作成（モックテスト）
+
+## Phase 3: PlaywrightPool [M] ※Phase 2と並列可
+- `src/streaming/playwright-pool.ts` を新規作成
+  - サーバー起動時に `chromium.launch()` を1回だけ実行しブラウザを保持
+  - `export/index.html` を事前ロードしたPageを保持
+  - `exportToPng(doc, scale)` は `page.evaluate()` のみ（起動オーバーヘッドなし）
+  - busy排他制御（同時レンダリング防止）
+  - 50回レンダリングごとにページ再作成（メモリリーク防止）
+- `test/streaming/playwright-pool.test.ts` を新規作成（モックテスト）
+
+## Phase 4: StreamingSession [L]
+- `src/streaming/session.ts` を新規作成（セッション管理の中核）
+  - `start()` → Transcribeストリーミング開始
+  - `feedAudio(chunk)` → PCMをTranscribeに供給
+  - final result受信時、蓄積テキスト +500文字超で構造化+PNG生成をトリガー
+  - 構造化中に次のトリガーが来たらスキップ（完了後に最新テキストで再実行）
+  - `end()` → 全文字起こしで最終版生成（既存の `structureTranscript()` + 厳格スキーマ）
+  - ストリーミング用システムプロンプト（途中テキスト前提）を定義
+  - `interimToStructured()` アダプタ: 不足分をプレースホルダ補完して `renderToExcalidraw()` に渡す
+- `test/streaming/session.test.ts` を新規作成（モックテスト）
+
+## Phase 5: サーバー + WebSocket [M]
+- `src/server.ts` を新規作成
+  - Express: 静的ファイル配信 (`public/`)、`GET /health`
+  - `ws` ライブラリ: WebSocket接続管理
+  - WebSocketプロトコル:
+    - クライアント→サーバー: `session_start`, Binary(PCM), `session_end`
+    - サーバー→クライアント: `transcript_partial/final`, `graphic_update/final`, `status`, `error`
+  - PlaywrightPool初期化・シャットダウン
+  - 同時セッション数制限（デフォルト1）
+  - Graceful shutdown
+
+## Phase 6: Web UI [M] ※Phase 7と並列可
+- `public/index.html` — メインページ
+- `public/audio-processor.js` — AudioWorklet Processor（Float32→Int16 PCM変換）
+- `public/app.js` — WebSocket接続、AudioWorklet管理、UI更新
+  - 録音開始: `getUserMedia()` → `AudioContext(sampleRate:16000)` → AudioWorklet → WebSocket Binary送信
+  - transcript表示: partial/finalメッセージでリアルタイム更新
+  - グラレコ表示: graphic_updateメッセージで `<img>` src更新
+  - 録音停止: `session_end` 送信 → `graphic_final` 受信で最終版表示
+- `public/style.css` — 最小限のスタイル
+- フレームワーク不使用（vanilla HTML/JS/CSS）
+
+## Phase 7: Config拡張 + ドキュメント [S] ※Phase 6と並列可
+- `src/config/index.ts` に streaming 設定追加（オプショナル、既存Config壊さない）
+  - `PORT` (デフォルト8080), `STREAMING_UPDATE_CHARS` (デフォルト500), `STREAMING_MAX_SESSIONS` (デフォルト1)
+- `.env.example` にストリーミング用環境変数追記
+- `README.md` にストリーミングモードのセクション追加
+
+## Phase 8: 統合テスト + 最終確認 [S]
+- `test/streaming/integration.test.ts` — 全体フローのモックテスト
+- `npm run build && npm run lint && npm run test` 全パス確認
+- ExecPlan に最終サマリ記述
 
 # 成果条件（観測可能なDoD）
-1) `npm run build && npm run lint && npm run test` が全てパスする
-2) feature/1-bootstrap-20260222 ブランチから main への Pull Request が作成されている
-3) 改善ポイントが GitHub Issue として登録されている（最低2件: Excalidrawレンダラー改善、進捗表示改善）
-4) PR作成時に lint と unit test が GitHub Actions で自動実行され、少なくともこのPRでは green であること（失敗は修正してからマージすること）
+1) `npm run build && npm run lint && npm run test` が全てパスする（既存+新規テスト）
+2) `npm run serve` でサーバーが起動し `http://localhost:8080` でWeb UIが表示される
+3) Web UIでマイク録音開始→文字起こしがリアルタイム表示される
+4) 500文字蓄積ごとにグラレコPNGが更新表示される
+5) 録音停止で最終版グラレコが生成される
+6) 既存CLI `npm run start -- generate --help` が引き続き動作する
+7) 各PhaseがIssue→ブランチ→PR→CIgreen→マージのサイクルで完了している
 
 # 非ゴール（明示的にやらない）
-- export/index.html の Excalidraw公式レンダラーへの移行（Issue化のみ）
-- Web UI の実装（CLIツールのみ）
-- ライブストリーミング文字起こし（バッチのみ）
-- OpenRouter対応（MVP後にIssue化するのみ）
+- 既存のバッチCLI機能の変更
 - 会議用途への一般化
 - 画像生成AIによるイラスト挿入
-- 大規模なリライト（影響範囲を限定し、変更サーフェス周辺の小規模リファクタに留める）
+- 認証・セキュリティ（exe.dev内部利用前提）
+- 複数同時セッション対応（v1は1セッションのみ）
 
 # GitHub認証（必須・起動直後に実行）
 - 作業開始時に `.env.local` から `GITHUB_TOKEN` を読み込み、`GH_TOKEN` として export すること:
   ```bash
   export GH_TOKEN=$(grep '^GITHUB_TOKEN=' .env.local | cut -d'=' -f2)
   ```
-- 以降の Issue 作成・更新・クローズ、PR 作成・マージ等の GitHub 操作はすべて `gh` CLI 経由で行うこと（curl + PAT直書き禁止）
-- git push にPATが必要な場合は以下の形式を使うこと（トークンはコマンド履歴に残るが、出力には含めないこと）:
+- 以降の Issue 作成・更新・クローズ、PR 作成・マージ等の GitHub 操作はすべて `gh` CLI 経由で行うこと
+- git push にPATが必要な場合は以下の形式を使うこと:
   ```bash
   git push "https://x-access-token:${GH_TOKEN}@github.com/o-shina/talkcapital.git" <ブランチ名>
   ```
 - `GH_TOKEN` の値をログ・コミットメッセージ・ExecPlan・PR本文に絶対に出力しないこと
 - `.env.local` はGit管理対象外（.gitignore済み）。コミットに含めないこと
 
-# ネットワーク制約への対応（重要）
-- 前回の実行では `gh` や `npm install` がネットワーク不通で失敗した
-- 今回も同様にネットワークがブロックされる可能性がある
+# ネットワーク制約への対応
+- ネットワークアクセスは設定で有効化済みだが、不通になる可能性がある
 - **ネットワーク不通を検知したら**:
-  1. まずローカルで可能な作業（コード改善、テスト、コミット）を全て完了させる
-  2. ネットワーク操作（gh issue create, gh pr create, git push）は最後にまとめて実行を試みる
-  3. ネットワーク操作が失敗した場合は、実行すべきコマンドを ExecPlan の「ネットワーク復旧後の手順」セクションに記録して終了する（ブロッカーにしない）
-  4. 「ネットワーク不通でした」と報告に含めること
+  1. ローカル作業を全て完了させる
+  2. ネットワーク操作は最後にまとめて実行を試みる
+  3. 失敗時はExecPlanの「ネットワーク復旧後の手順」に記録して終了（ブロッカーにしない）
 
 # チェックポイント（Entire CLI）
-- 各マイルストーン完了時に `entire checkpoint` コマンドでセッション履歴を保存すること
-- Entire CLI が利用可能かどうかを起動時に検知し、以下のように振る舞うこと:
-  - **利用可能な場合**: マイルストーン完了ごとに `entire checkpoint -m "M<n>: <マイルストーン名>"` を実行
-  - **利用不可の場合**: `entire: command not found` 等のエラーを検知したら、ExecPlan の Decision Log に「Entire CLI 未検出のためチェックポイントをスキップ」と記録し、以降のチェックポイント呼び出しをスキップして作業を継続する（ブロッカーにしない）
-- チェックポイントの有無にかかわらず、Git コミットは必ず行うこと（コミットが正のチェックポイント）
+- Entire CLI が利用可能なら `entire checkpoint -m "M<n>: <マイルストーン名>"` を実行
+- 利用不可なら Decision Log に記録してスキップ（ブロッカーにしない）
+- Git コミットは必ず行うこと
 
 # 自律作業の運用ルール（Issue駆動 + ExecPlan）
 ## 0) 作業単位
-- タスクは必ず細かく分割し、GitHub Issue で管理してください。
-- あなたが Issue の作成・更新・クローズをすべて担当してください（私に依頼しない）。
-- 改善点（バグ、UX改善、技術的負債、テスト不足等）を発見した場合は、自律的に GitHub Issue を新規作成し、そのIssue単位で着手してください。
+- 各Phaseごとに GitHub Issue を作成し、Issue単位で作業する
+- あなたが Issue の作成・更新・クローズをすべて担当する
 
 ## 1) ブランチ戦略 / PR / マージ
-- 今回は既存の feature/1-bootstrap-20260222 ブランチ上で作業を継続してください（新規ブランチ不要）。
-- main への反映は必ず Pull Request 経由で行ってください。
-- PR のマージもあなたが実施して構いません。ただし **動作確認が完了し、バグがない状態**であることを確認してからマージしてください。
-  - 具体的には: ローカル検証（`npm run build && npm run lint && npm run test`） + CI（GitHub Actions）の両方が green であること
+- 各PhaseごとにIssue番号付きブランチを `main` から作成（例: `feature/13-transcribe-streaming`）
+- main への反映は必ず Pull Request 経由で行う
+- PR のマージもあなたが実施してよい（ローカル検証 + CI green 確認後）
 
-## 2) ExecPlan-first（大きい変更は計画書を先に書く）
-- まず ExecPlan を作成し、それに従って実装してください。
-- ExecPlan ファイル:
-  - パス: docs/execplans/<YYYY-MM-DD>_<短いトピック>.md
-  - "自己完結"であること（新規メンバー/ステートレスエージェントがその文書だけで完遂できるレベル）
-  - 必須: マイルストーン、受け入れ条件、検証コマンド、リスクと緩和策、ロールバック、意思決定ログ、進捗ログ、既知の制約
+## 2) ExecPlan-first
+- まず ExecPlan を `docs/execplans/<YYYY-MM-DD>_streaming-mode.md` に作成
+- 必須: マイルストーン、受け入れ条件、検証コマンド、リスクと緩和策、ロールバック、意思決定ログ、進捗ログ
 
 ## 3) 実行ループ（質問しない）
-- 実装開始後は「次どうする？」などの確認はせず、ExecPlan のマイルストーン順に自律で進めてください。
-- 各マイルストーン完了ごとに必ず:
-  - 検証コマンド実行
-  - 主要な証跡（実行コマンド + 重要な出力の要点）を ExecPlan に記録
-  - Progress セクション更新
-  - コミット（メッセージ: "M<n>: <マイルストーン名>"）
-- Issue はマイルストーンや成果でクローズできる粒度にして、完了したら必ずクローズしてください。
+- ExecPlan のPhase順に自律で進める
+- 各Phase完了ごとに: 検証→証跡記録→コミット→Issue対応→PR→マージ
 
-# CI要件（必須）
-- .github/workflows/ci.yml は既に存在する。内容を確認し、必要なら修正すること。
-- 最低限: チェックアウト → 依存インストール → lint → test が動くこと。
+# CI要件
+- `.github/workflows/ci.yml` に変更が必要なら修正する
+- build → lint → test が全てパスすること
 
 # 安全・禁止事項（厳守）
-- 破壊的削除コマンドは禁止です。特に `rm -rf ~/` やそれに類する危険な削除は絶対に実行しないこと。
-- 重要ディレクトリに対する再帰削除は原則禁止。必要がある場合は削除ではなく退避（move）や限定的な削除に留める。
-- シークレットを出力しない。キー/トークンらしき文字列をログに出さない。環境変数のダンプ禁止。
+- 破壊的削除コマンドは禁止
+- シークレットを出力しない
+- 既存のバッチCLI機能を壊さない
 
-# ブロッカー時の挙動（例外ルール）
-- 実行が詰まった場合のみ、以下の形で進めてください（それ以外は質問しない）:
-  1) 具体的な選択肢を2〜3案提示
-  2) もっとも安全で後戻り可能な案をデフォルトとして選択し、可能な範囲まで実行
-  3) ブロッカー内容・判断・選択理由を ExecPlan の Decision Log に記録
+# ブロッカー時の挙動
+- 選択肢を2-3案提示し、最も安全な案を選択して実行
+- Decision Log に記録
 
-# 実行チェックリスト（必須）
-1) `npm run build && npm run lint && npm run test` で現状がgreenであることを確認
-2) コード品質改善（進捗表示、READMEなど）
-3) 改善内容をコミット
-4) GitHub Issue を作成（改善ポイント: Excalidrawレンダラー、進捗表示、OpenRouter対応 等）
-5) Pull Request を feature/1-bootstrap-20260222 → main で作成
-6) CI green 確認
-7) ExecPlan に最終サマリ（変更点/検証方法/既知の制限/フォローアップ）を日本語で記述
+# 実行チェックリスト（起動時に上から順に実行）
+1) GH_TOKEN を export
+2) `npm run build && npm run lint && npm run test` で現状がgreenであることを確認
+3) ExecPlan を作成
+4) Phase 0 から順に実装開始
+5) 各Phase: Issue作成 → ブランチ作成 → 実装 → テスト → コミット → PR → CI green → マージ
+6) 全Phase完了後、ExecPlanに最終サマリ記述

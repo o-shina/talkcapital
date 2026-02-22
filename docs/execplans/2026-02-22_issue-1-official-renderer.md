@@ -46,7 +46,9 @@
 - [x] M2: exporter実装の置換（公式`exportToBlob`利用）
   - 実行: `export/index.html` を全面更新
   - 要点: 独自Canvas2D描画ロジックを削除し、公式 `exportToBlob` ベースへ移行
-- [ ] M3: テスト更新とローカル検証
+- [x] M3: テスト更新とローカル検証
+  - 実行: `npm run build && npm run lint && npm run test`
+  - 要点: build/lint/test すべて成功（7 test files / 15 tests passed）
 - [ ] M4: PR作成・CI確認・mainマージ
 
 ## ネットワーク復旧後の手順

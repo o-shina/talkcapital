@@ -78,6 +78,8 @@ export class TranscribeStream extends EventEmitter<TranscribeStreamEvents> {
   ): Promise<void> {
     if (!stream) {
       this.emit('error', new Error('TranscriptResultStream is undefined'));
+      this.stopSilenceTimer();
+      this.emit('close');
       return;
     }
 
@@ -127,6 +129,7 @@ export class TranscribeStream extends EventEmitter<TranscribeStreamEvents> {
     } catch (err) {
       this.emit('error', err instanceof Error ? err : new Error(String(err)));
     } finally {
+      this.stopSilenceTimer();
       this.emit('close');
     }
   }

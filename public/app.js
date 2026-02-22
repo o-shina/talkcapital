@@ -6,6 +6,7 @@ let audioCtx = null;
 let mediaStream = null;
 /** @type {AudioWorkletNode | null} */
 let workletNode = null;
+let waitingForFinal = false;
 
 const btnStart = document.getElementById('btn-start');
 const btnStop = document.getElementById('btn-stop');
@@ -22,7 +23,6 @@ function setStatus(msg) {
 }
 
 function updateTranscript() {
-  // 既存の子要素をすべて除去
   while (transcriptEl.firstChild) {
     transcriptEl.removeChild(transcriptEl.firstChild);
   }
@@ -45,6 +45,34 @@ function showGraphic(base64) {
   graphicEl.src = 'data:image/png;base64,' + base64;
   graphicEl.style.display = 'block';
   graphicPlaceholder.style.display = 'none';
+}
+
+function cleanupAudio() {
+  if (workletNode) {
+    workletNode.disconnect();
+    workletNode = null;
+  }
+  if (audioCtx) {
+    audioCtx.close().catch(() => {});
+    audioCtx = null;
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((t) => t.stop());
+    mediaStream = null;
+  }
+}
+
+function closeWebSocket() {
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+}
+
+function resetUI() {
+  btnStart.disabled = false;
+  btnStop.disabled = true;
+  waitingForFinal = false;
 }
 
 function connectWebSocket() {
@@ -75,6 +103,11 @@ function connectWebSocket() {
       case 'graphic_final':
         showGraphic(msg.png);
         setStatus('最終版グラレコ生成完了');
+        // 最終版を受信したら接続を閉じる
+        if (waitingForFinal) {
+          closeWebSocket();
+          resetUI();
+        }
         break;
       case 'status':
         setStatus(msg.message);
@@ -87,8 +120,10 @@ function connectWebSocket() {
   };
 
   ws.onclose = () => {
-    setStatus('切断');
+    setStatus(waitingForFinal ? '切断（最終版生成中に切断されました）' : '切断');
     ws = null;
+    cleanupAudio();
+    resetUI();
   };
 
   ws.onerror = (err) => {
@@ -135,6 +170,7 @@ async function startRecording() {
     }
   } catch (err) {
     console.error('Recording start failed:', err);
+    cleanupAudio();
     setStatus('マイクの使用が許可されていません');
   }
 }
@@ -142,25 +178,13 @@ async function startRecording() {
 async function stopRecording() {
   btnStop.disabled = true;
   setStatus('最終版を生成中...');
+  waitingForFinal = true;
 
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'session_end' }));
   }
 
-  if (workletNode) {
-    workletNode.disconnect();
-    workletNode = null;
-  }
-  if (audioCtx) {
-    await audioCtx.close();
-    audioCtx = null;
-  }
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((t) => t.stop());
-    mediaStream = null;
-  }
-
-  btnStart.disabled = false;
+  cleanupAudio();
 }
 
 btnStart.addEventListener('click', startRecording);

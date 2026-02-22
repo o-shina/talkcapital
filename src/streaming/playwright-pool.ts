@@ -22,7 +22,13 @@ export class PlaywrightPool {
 
   async init(): Promise<void> {
     this.browser = await this.launchBrowser();
-    await this.preparePage();
+    try {
+      await this.preparePage();
+    } catch (err) {
+      await this.browser.close().catch(() => {});
+      this.browser = null;
+      throw err;
+    }
   }
 
   async exportToPng(

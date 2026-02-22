@@ -83,6 +83,74 @@ export const interimStructuredContentSchema = z.object({
 
 export type InterimStructuredContent = z.infer<typeof interimStructuredContentSchema>;
 
+export function getInterimStructuredContentJsonSchema(): Record<string, unknown> {
+  return {
+    type: 'object',
+    required: ['title', 'mainMessage', 'blocks', 'speechBubbles', 'actions'],
+    properties: {
+      title: { type: 'string', minLength: 1, maxLength: 30 },
+      mainMessage: { type: 'string', minLength: 1, maxLength: 80 },
+      blocks: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 4,
+        items: {
+          type: 'object',
+          required: ['heading', 'bullets'],
+          properties: {
+            heading: { type: 'string', minLength: 1, maxLength: 50 },
+            bullets: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 3,
+              items: {
+                type: 'object',
+                required: ['text'],
+                properties: {
+                  text: { type: 'string', minLength: 1, maxLength: 50 },
+                },
+                additionalProperties: false,
+              },
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+      speechBubbles: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 4,
+        items: {
+          type: 'object',
+          required: ['quote'],
+          properties: {
+            quote: { type: 'string', minLength: 1, maxLength: 50 },
+            emphasis: {
+              type: 'string',
+              enum: ['important', 'surprising', 'humorous', 'inspiring'],
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+      actions: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 3,
+        items: {
+          type: 'object',
+          required: ['text'],
+          properties: {
+            text: { type: 'string', minLength: 1, maxLength: 50 },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    additionalProperties: false,
+  };
+}
+
 export function getStructuredContentJsonSchema(): Record<string, unknown> {
   return {
     type: 'object',

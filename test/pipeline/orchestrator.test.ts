@@ -28,6 +28,7 @@ import { exportToPng } from '../../src/services/exporter.js';
 
 const config = {
   aws: { region: 'ap-northeast-1', s3Bucket: 'bucket', s3KeyPrefix: 'prefix' },
+  llm: { provider: 'bedrock' as const },
   bedrock: { region: 'us-east-1', modelId: 'model' },
   output: { scale: 2 },
 };

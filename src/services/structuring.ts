@@ -8,6 +8,7 @@ import {
 
 export interface StructuringDependencies {
   client?: Pick<BedrockRuntimeClient, 'send'>;
+  fetchImpl?: typeof fetch;
 }
 
 export async function structureTranscript(
@@ -15,7 +16,18 @@ export async function structureTranscript(
   config: Config,
   deps: StructuringDependencies = {},
 ): Promise<StructuredContent> {
-  const client = deps.client ?? new BedrockRuntimeClient({ region: config.bedrock.region });
+  if (config.llm.provider === 'openrouter') {
+    return structureWithOpenRouter(transcript, config, deps.fetchImpl ?? fetch);
+  }
+  return structureWithBedrock(transcript, config, deps.client);
+}
+
+async function structureWithBedrock(
+  transcript: string,
+  config: Config,
+  clientOverride?: Pick<BedrockRuntimeClient, 'send'>,
+): Promise<StructuredContent> {
+  const client = clientOverride ?? new BedrockRuntimeClient({ region: config.bedrock.region });
 
   let retryContext = '';
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -62,6 +74,79 @@ export async function structureTranscript(
   }
 
   throw new Error('構造化処理に失敗しました');
+}
+
+async function structureWithOpenRouter(
+  transcript: string,
+  config: Config,
+  fetchImpl: typeof fetch,
+): Promise<StructuredContent> {
+  const openrouter = config.openrouter;
+  if (!openrouter) {
+    throw new Error('OpenRouter設定が見つかりません');
+  }
+
+  let retryContext = '';
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetchImpl(`${openrouter.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openrouter.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: openrouter.model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            {
+              role: 'user',
+              content: `以下は講演の文字起こしです。要件に従って構造化してください。\n\n${transcript}${retryContext}`,
+            },
+          ],
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: 'structured_output',
+              strict: true,
+              schema: getStructuredContentJsonSchema(),
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = (await response.json()) as Record<string, unknown>;
+      const rawContent = extractOpenRouterContent(data);
+      const parsedContent = typeof rawContent === 'string' ? JSON.parse(rawContent) : rawContent;
+      return structuredContentSchema.parse(parsedContent);
+    } catch (error) {
+      if (attempt === 3) {
+        throw error;
+      }
+      retryContext = `\n\n前回の出力はスキーマ検証に失敗しました。エラーを修正して再出力してください: ${String(error)}`;
+    }
+  }
+
+  throw new Error('OpenRouter構造化処理に失敗しました');
+}
+
+function extractOpenRouterContent(data: Record<string, unknown>): unknown {
+  const choices = data.choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    throw new Error('OpenRouterレスポンスにchoicesがありません');
+  }
+
+  const firstChoice = choices[0] as Record<string, unknown>;
+  const message = firstChoice.message as Record<string, unknown> | undefined;
+  const content = message?.content;
+  if (typeof content === 'undefined') {
+    throw new Error('OpenRouterレスポンスにmessage.contentがありません');
+  }
+  return content;
 }
 
 function extractToolUseInput(content: unknown[]): unknown {

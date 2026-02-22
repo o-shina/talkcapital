@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TalkCapital - Streaming</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>TalkCapital Streaming</h1>
+    <span id="status">待機中</span>
+  </header>
+
+  <div class="controls">
+    <button id="btn-start">録音開始</button>
+    <button id="btn-stop" disabled>録音停止</button>
+  </div>
+
+  <div class="main-content">
+    <div class="transcript-panel">
+      <h2>文字起こし</h2>
+      <div id="transcript"></div>
+    </div>
+    <div class="graphic-panel">
+      <h2>グラフィックレコーディング</h2>
+      <img id="graphic" alt="グラレコ" style="display:none;">
+      <span id="graphic-placeholder">録音を開始するとグラレコが生成されます</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

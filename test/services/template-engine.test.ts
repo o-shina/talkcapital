@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import sampleStructured from '../fixtures/sample-structured.json';
+import sampleStructured from '../fixtures/sample-structured.json' with { type: 'json' };
 import { renderToExcalidraw } from '../../src/services/template-engine.js';
 
 describe('template-engine', () => {
   test('3ブロックでExcalidrawドキュメントを生成できる', () => {
-    const doc = renderToExcalidraw(sampleStructured);
+    const doc = renderToExcalidraw(sampleStructured as any);
     expect(doc.type).toBe('excalidraw');
     expect(doc.appState.width).toBe(1920);
     expect(doc.appState.height).toBe(1080);
@@ -25,7 +25,7 @@ describe('template-engine', () => {
         { heading: '補足', bullets: [{ text: '四つ目のブロック' }] },
       ],
     };
-    const doc = renderToExcalidraw(data);
+    const doc = renderToExcalidraw(data as any);
     const headingTexts = doc.elements.filter((e) => e.type === 'text').map((e: any) => e.text);
     expect(headingTexts).toContain('補足');
   });

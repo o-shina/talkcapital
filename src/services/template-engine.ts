@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { StructuredContent } from '../types/structured-content.js';
-import type { ExcalidrawDocument, ExcalidrawElement } from '../types/excalidraw.js';
+import type { ExcalidrawDocument, ExcalidrawElement, ExcalidrawShapeElement } from '../types/excalidraw.js';
 import { CANVAS, LAYOUT } from '../templates/layout.js';
 import { COLORS, STYLE } from '../templates/colors.js';
 
@@ -52,7 +52,7 @@ export function renderToExcalidraw(content: StructuredContent): ExcalidrawDocume
       break;
     }
     elements.push(
-      ...buildEllipseWithText(layout, `\"${bubble.quote}\"`, COLORS.speechBubble.fill, COLORS.speechBubble.stroke),
+      ...buildEllipseWithText(layout, `"${bubble.quote}"`, COLORS.speechBubble.fill, COLORS.speechBubble.stroke),
     );
   }
 
@@ -132,7 +132,7 @@ function buildBoundBoxWithText(
     textAlign: options?.textAlign ?? layout.textAlign ?? 'center',
     containerId: container.id,
   });
-  container.boundElements = [{ type: 'text', id: textElement.id }];
+  (container as ExcalidrawShapeElement).boundElements = [{ type: 'text', id: textElement.id }];
   return [container, textElement];
 }
 
@@ -160,7 +160,7 @@ function buildEllipseWithText(
     textAlign: 'center',
     containerId: ellipse.id,
   });
-  ellipse.boundElements = [{ type: 'text', id: textElement.id }];
+  (ellipse as ExcalidrawShapeElement).boundElements = [{ type: 'text', id: textElement.id }];
   return [ellipse, textElement];
 }
 

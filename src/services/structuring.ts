@@ -39,7 +39,7 @@ export async function structureTranscript(
               name: 'structured_output',
               description: '講演の構造化データを出力する',
               inputSchema: {
-                json: getStructuredContentJsonSchema(),
+                json: getStructuredContentJsonSchema() as import('@smithy/types').DocumentType,
               },
             },
           },
@@ -50,7 +50,7 @@ export async function structureTranscript(
 
     try {
       const response = await client.send(command);
-      const toolInput = extractToolUseInput(response.output?.message?.content ?? []);
+      const toolInput = extractToolUseInput((response.output?.message?.content ?? []) as unknown[]);
       const parsed = structuredContentSchema.parse(toolInput);
       return parsed;
     } catch (error) {
@@ -64,9 +64,10 @@ export async function structureTranscript(
   throw new Error('構造化処理に失敗しました');
 }
 
-function extractToolUseInput(content: Array<Record<string, unknown>>): unknown {
+function extractToolUseInput(content: unknown[]): unknown {
   for (const item of content) {
-    const toolUse = item.toolUse as Record<string, unknown> | undefined;
+    const block = item as Record<string, unknown>;
+    const toolUse = block.toolUse as Record<string, unknown> | undefined;
     if (toolUse && toolUse.input) {
       return toolUse.input;
     }

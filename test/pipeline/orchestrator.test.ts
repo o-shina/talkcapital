@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import sampleStructured from '../fixtures/sample-structured.json';
+import sampleStructured from '../fixtures/sample-structured.json' with { type: 'json' };
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { readFile, writeFile } from 'node:fs/promises';

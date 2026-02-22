@@ -43,7 +43,9 @@
 - [x] M1: 依存追加とレンダリング方式の設計反映
   - 実行: `NPM_CONFIG_CACHE=/tmp/talkcapital-npm-cache npm install @excalidraw/excalidraw`
   - 要点: `@excalidraw/excalidraw` を追加し、型定義上 `exportToBlob` 利用可能を確認
-- [ ] M2: exporter実装の置換（公式`exportToBlob`利用）
+- [x] M2: exporter実装の置換（公式`exportToBlob`利用）
+  - 実行: `export/index.html` を全面更新
+  - 要点: 独自Canvas2D描画ロジックを削除し、公式 `exportToBlob` ベースへ移行
 - [ ] M3: テスト更新とローカル検証
 - [ ] M4: PR作成・CI確認・mainマージ
 

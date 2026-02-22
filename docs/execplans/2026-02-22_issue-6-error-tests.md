@@ -39,7 +39,8 @@
 ## 進捗ログ
 - [x] M1: 異常系シナリオの選定とテスト設計
   - 対象: transcription（HTTP失敗/タイムアウト）, structuring（OpenRouter HTTP失敗）, exporter（レンダリング失敗時close）
-- [ ] M2: 異常系テスト実装（transcription/structuring/exporter）
+- [x] M2: 異常系テスト実装（transcription/structuring/exporter）
+  - 変更: `test/services/transcription.test.ts`, `test/services/structuring.test.ts`, `test/services/exporter.test.ts`
 - [ ] M3: ローカル検証（build/lint/test）
 - [ ] M4: PR作成・CI確認・mainマージ
 

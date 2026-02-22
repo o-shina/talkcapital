@@ -80,4 +80,12 @@ describe('exporter', () => {
     expect(mocks.evaluateMock).toHaveBeenCalledOnce();
     expect(mocks.closeMock).toHaveBeenCalledOnce();
   }, 30000);
+
+  test('レンダリング失敗時もbrowserをcloseする', async () => {
+    mocks.evaluateMock.mockRejectedValueOnce(new Error('render failed'));
+    const output = join(tmpdir(), `talkcapital-export-fail-${Date.now()}.png`);
+
+    await expect(exportToPng(minimalDoc, output, 1)).rejects.toThrow('render failed');
+    expect(mocks.closeMock).toHaveBeenCalled();
+  });
 });

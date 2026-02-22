@@ -1,0 +1,102 @@
+あなたはこのリポジトリ内で自律的に作業するCodexです。/init は完了しており、AGENTS.md と docs/ 配下のドキュメント内容を理解済みです。
+以降の出力（計画書・Issue・PR本文・コミットメッセージ・ログ・私への報告）はすべて日本語で行ってください。
+あなたは AGENTS.md と .agent/PLANS.md を最優先のルールとして厳守してください。
+
+# ミッション
+以下の変更を、改善（テスト/ドキュメント/小規模リファクタ）込みで、エンドツーエンドに自律実行してください。
+docs/tasks.md に定義された14タスク（4フェーズ）に従い、15分講演の音声から手書き風グラフィックレコーディングPNGを自動生成するTypeScript CLIツールをゼロから実装する。技術スタックはAmazon Transcribe（バッチ）+ Amazon Bedrock Claude（Converse API）+ Excalidraw JSON生成 + Playwright PNGエクスポート。設計ドキュメント（docs/PRD.md, docs/architecture.md, docs/tasks.md）は作成済みなので、これらに忠実に実装すること。
+
+# 成果条件（観測可能なDoD）
+1) `npx talkcapital generate --skip-transcribe --transcript test/fixtures/sample-transcript.txt --output /tmp/test.png` を実行すると、手書き風グラレコPNG（3840x2160）が生成される
+2) `npx talkcapital generate --input <音声ファイル> --output /tmp/test.png` を実行すると、S3アップロード→Transcribeバッチ文字起こし→Bedrock Claude構造化→Excalidraw JSON→PNG の全パイプラインが動作する
+3) 全ユニットテスト（vitest）がパスし、各サービス（transcription, structuring, template-engine, exporter）のモック付きテストがある
+4) PR作成時に lint と unit test が GitHub Actions で自動実行され、少なくともこのPRでは green であること（失敗は修正してからマージすること）
+
+# 非ゴール（明示的にやらない）
+- Web UI の実装（CLIツールのみ）
+- ライブストリーミング文字起こし（バッチのみ）
+- OpenRouter対応（MVP後にIssue化するのみ）
+- 会議用途への一般化
+- 画像生成AIによるイラスト挿入
+- 大規模なリライト（影響範囲を限定し、変更サーフェス周辺の小規模リファクタに留める）
+
+# GitHub認証（必須・起動直後に実行）
+- 作業開始時に `.env.local` から `GITHUB_TOKEN` を読み込み、`GH_TOKEN` として export すること:
+  ```bash
+  export GH_TOKEN=$(grep '^GITHUB_TOKEN=' .env.local | cut -d'=' -f2)
+  ```
+- 以降の Issue 作成・更新・クローズ、PR 作成・マージ等の GitHub 操作はすべて `gh` CLI 経由で行うこと（curl + PAT直書き禁止）
+- `GH_TOKEN` の値をログ・コミットメッセージ・ExecPlan・PR本文に絶対に出力しないこと
+- `.env.local` はGit管理対象外（.gitignore済み）。コミットに含めないこと
+
+# チェックポイント（Entire CLI）
+- 各マイルストーン完了時に `entire checkpoint` コマンドでセッション履歴を保存すること
+- Entire CLI が利用可能かどうかを起動時に検知し、以下のように振る舞うこと:
+  - **利用可能な場合**: マイルストーン完了ごとに `entire checkpoint -m "M<n>: <マイルストーン名>"` を実行
+  - **利用不可の場合**: `entire: command not found` 等のエラーを検知したら、ExecPlan の Decision Log に「Entire CLI 未検出のためチェックポイントをスキップ」と記録し、以降のチェックポイント呼び出しをスキップして作業を継続する（ブロッカーにしない）
+- チェックポイントの有無にかかわらず、Git コミットは必ず行うこと（コミットが正のチェックポイント）
+
+# 自律作業の運用ルール（Issue駆動 + ExecPlan）
+## 0) 作業単位
+- タスクは必ず細かく分割し、GitHub Issue で管理してください。
+- あなたが Issue の作成・更新・クローズをすべて担当してください（私に依頼しない）。
+- 改善点（バグ、UX改善、技術的負債、テスト不足等）を発見した場合は、自律的に GitHub Issue を新規作成し、そのIssue単位で着手してください。
+
+## 1) ブランチ戦略 / PR / マージ
+- いかなる一周の作業でも必ず feature ブランチを作成して実装してください。
+  - ブランチ名: feature/<issue番号>-<短いトピック>-<YYYYMMDD>
+- main への反映は必ず Pull Request 経由で行ってください。
+- PR のマージもあなたが実施して構いません。ただし **動作確認が完了し、バグがない状態**であることを確認してからマージしてください。
+  - 具体的には: ローカル検証（定義した検証コマンド） + CI（GitHub Actions）の両方が green であること
+
+## 2) ExecPlan-first（大きい変更は計画書を先に書く）
+- まず ExecPlan を作成し、それに従って実装してください。
+- ExecPlan ファイル:
+  - パス: docs/execplans/<YYYY-MM-DD>_<短いトピック>.md
+  - .agent/PLANS.md のテンプレ/制約を厳密に守ること
+  - "自己完結"であること（新規メンバー/ステートレスエージェントがその文書だけで完遂できるレベル）
+  - 必須: マイルストーン、受け入れ条件、検証コマンド、リスクと緩和策、ロールバック、意思決定ログ、進捗ログ、既知の制約
+
+## 3) 実行ループ（質問しない）
+- 実装開始後は「次どうする？」などの確認はせず、ExecPlan のマイルストーン順に自律で進めてください。
+- 各マイルストーン完了ごとに必ず:
+  - 検証コマンド実行
+  - 主要な証跡（実行コマンド + 重要な出力の要点）を ExecPlan に記録
+  - Progress セクション更新
+  - コミット（メッセージ: "M<n>: <マイルストーン名> (#<issue番号>)"）
+- Issue はマイルストーンや成果でクローズできる粒度にして、完了したら必ずクローズしてください。
+
+# CI要件（必須）
+- PR が作成/更新されたタイミングで、lint と unit test が GitHub Actions で自動実行されるように CI を追加してください。
+- 既存のツールがある場合はそれに合わせて構成し、なければ最小で以下を満たしてください:
+  - チェックアウト
+  - 依存インストール
+  - lint 実行
+  - unit test 実行
+- どのコマンドを lint/test に使うかはリポジトリを調査して決め、ExecPlan に明記してください。
+
+# UI実装がある場合の追加ルール（必須）
+- UI の実装を伴う場合、Agent Browser を使って適宜 UI の状態を確認しながら改善を進めてください。
+- もし Agent Browser が利用不能な環境なら、代替として Playwright 等のE2E/スクショ自動化で UI 状態を確認し、その証跡を ExecPlan に残してください。
+
+# 安全・禁止事項（厳守）
+- 破壊的削除コマンドは禁止です。特に `rm -rf ~/` やそれに類する危険な削除は絶対に実行しないこと。
+- 重要ディレクトリに対する再帰削除は原則禁止。必要がある場合は削除ではなく退避（move）や限定的な削除に留める。
+- シークレットを出力しない。キー/トークンらしき文字列をログに出さない。環境変数のダンプ禁止。
+
+# ブロッカー時の挙動（例外ルール）
+- 実行が詰まった場合のみ、以下の形で進めてください（それ以外は質問しない）:
+  1) 具体的な選択肢を2〜3案提示
+  2) もっとも安全で後戻り可能な案をデフォルトとして選択し、可能な範囲まで実行
+  3) ブロッカー内容・判断・選択理由を ExecPlan の Decision Log に記録
+
+# 実行チェックリスト（必須）
+1) リポジトリ構造と docs/AGENTS.md/.agent/PLANS.md を参照し、既存の開発フロー/コマンドを特定
+2) タスクを分割し、GitHub Issue を複数作成（issueごとに小さく）
+3) 最初の Issue 用に feature ブランチ作成
+4) ExecPlan 作成（docs/execplans/）
+5) マイルストーン実行→検証→証跡→コミット→Issue更新/クローズ
+6) PR 作成（CIが回ることを確認）
+7) CI green + ローカル動作確認完了後にマージ
+8) 必要なら次の改善Issueを作成し、同様に繰り返し
+9) 最後に ExecPlan に最終サマリ（変更点/検証方法/既知の制限/フォローアップ）を日本語で記述

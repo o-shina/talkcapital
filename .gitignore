@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# OS
+.DS_Store
+
+# Test
+coverage/
+test-results/
+playwright-report/
+
+# Temporary
+/tmp/
+*.tmp

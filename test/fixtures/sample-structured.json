@@ -1,0 +1,39 @@
+{
+  "title": "チームの心理的安全性",
+  "mainMessage": "失敗を恐れず発言できる環境が、チームの成果を最大化する",
+  "blocks": [
+    {
+      "heading": "心理的安全性とは",
+      "bullets": [
+        { "text": "対人リスクを取れる環境" },
+        { "text": "発言しやすさが成果を左右" },
+        { "text": "沈黙は危険信号" }
+      ]
+    },
+    {
+      "heading": "リーダーの役割",
+      "bullets": [
+        { "text": "失敗を先に共有する" },
+        { "text": "質問を歓迎する" },
+        { "text": "感謝を言葉で伝える" }
+      ]
+    },
+    {
+      "heading": "実践のポイント",
+      "bullets": [
+        { "text": "会議冒頭で安心を宣言" },
+        { "text": "否定せずに問い返す" }
+      ]
+    }
+  ],
+  "speechBubbles": [
+    { "quote": "失敗は学びのチャンス", "emphasis": "important" },
+    { "quote": "誰でも質問していい", "emphasis": "inspiring" },
+    { "quote": "サイレント同意は危険", "emphasis": "surprising" }
+  ],
+  "actions": [
+    { "text": "次の会議で失敗談を共有する" },
+    { "text": "チームメンバーに感謝を伝える" },
+    { "text": "質問しやすい空気を作る" }
+  ]
+}

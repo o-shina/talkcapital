@@ -1,0 +1,41 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://talkcapital.local",
+  "appState": {
+    "viewBackgroundColor": "#fffbeb",
+    "width": 1920,
+    "height": 1080
+  },
+  "elements": [
+    {
+      "id": "title-box",
+      "type": "rectangle",
+      "x": 30,
+      "y": 20,
+      "width": 580,
+      "height": 80,
+      "strokeColor": "#e8590c",
+      "backgroundColor": "#ffd8a8",
+      "strokeWidth": 2,
+      "roughness": 1
+    },
+    {
+      "id": "title-text",
+      "type": "text",
+      "x": 50,
+      "y": 35,
+      "width": 540,
+      "height": 50,
+      "text": "チームの心理的安全性",
+      "fontSize": 36,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "strokeColor": "#212529",
+      "backgroundColor": "transparent",
+      "strokeWidth": 1,
+      "roughness": 0
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import sampleStructured from '../fixtures/sample-structured.json' with { type: 'json' };
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -33,8 +33,15 @@ const config = {
 };
 
 describe('orchestrator', () => {
+  let stdoutSpy: any;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    stdoutSpy?.mockRestore();
   });
 
   test('skip-transcribeフローが動作', async () => {
@@ -81,5 +88,23 @@ describe('orchestrator', () => {
     const saved = JSON.parse(await readFile(outputJson, 'utf8'));
     expect(saved.type).toBe('excalidraw');
     expect(vi.mocked(exportToPng)).not.toHaveBeenCalled();
+  });
+
+  test('verbose指定がなくても主要ステージを表示する', async () => {
+    const transcriptFile = join(tmpdir(), `sample-${Date.now()}.txt`);
+    await writeFile(transcriptFile, 'sample transcript', 'utf8');
+
+    await runPipeline(
+      {
+        transcriptOverride: transcriptFile,
+        outputPath: '/tmp/out.png',
+      },
+      config,
+    );
+
+    expect(stdoutSpy).toHaveBeenCalledWith('[1/4] 文字起こしスキップ: 既存ファイルを読み込み\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[2/4] Bedrock 構造化中...\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[3/4] テンプレート描画中...\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[4/4] PNG エクスポート 中...\n');
   });
 });

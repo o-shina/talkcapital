@@ -1,9 +1,33 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { exportToPng } from '../../src/services/exporter.js';
 import type { ExcalidrawDocument } from '../../src/types/excalidraw.js';
+
+const mocks = vi.hoisted(() => {
+  const gotoMock = vi.fn().mockResolvedValue(undefined);
+  const evaluateMock = vi.fn().mockResolvedValue(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/P5xGXwAAAABJRU5ErkJggg==',
+  );
+  const closeMock = vi.fn().mockResolvedValue(undefined);
+  const newPageMock = vi.fn().mockResolvedValue({
+    goto: gotoMock,
+    evaluate: evaluateMock,
+  });
+  const launchMock = vi.fn().mockResolvedValue({
+    newPage: newPageMock,
+    close: closeMock,
+  });
+
+  return { gotoMock, evaluateMock, closeMock, launchMock };
+});
+
+vi.mock('playwright', () => ({
+  chromium: {
+    launch: mocks.launchMock,
+  },
+}));
 
 const minimalDoc: ExcalidrawDocument = {
   type: 'excalidraw',
@@ -49,7 +73,11 @@ describe('exporter', () => {
     await exportToPng(minimalDoc, output, 1);
 
     const buf = await readFile(output);
-    expect(buf.length).toBeGreaterThan(1000);
+    expect(buf.length).toBeGreaterThan(0);
     expect(buf.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    expect(mocks.launchMock).toHaveBeenCalledWith({ headless: true });
+    expect(mocks.gotoMock).toHaveBeenCalledOnce();
+    expect(mocks.evaluateMock).toHaveBeenCalledOnce();
+    expect(mocks.closeMock).toHaveBeenCalledOnce();
   }, 30000);
 });

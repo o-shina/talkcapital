@@ -7,6 +7,7 @@ import type { Config } from '../../src/config/index.js';
 
 const config: Config = {
   aws: { region: 'ap-northeast-1', s3Bucket: 'bucket', s3KeyPrefix: 'prefix' },
+  llm: { provider: 'bedrock' },
   bedrock: { region: 'us-east-1', modelId: 'model' },
   output: { scale: 2 },
 };

@@ -26,6 +26,11 @@ AWS_S3_BUCKET=your-bucket
 AWS_S3_KEY_PREFIX=talkcapital
 BEDROCK_REGION=us-east-1
 BEDROCK_MODEL_ID=anthropic.claude-sonnet-4-20250514-v1:0
+LLM_PROVIDER=bedrock
+# LLM_PROVIDER=openrouter のとき必須
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 OUTPUT_SCALE=2
 ```
 
@@ -90,6 +95,10 @@ npx talkcapital generate --skip-transcribe --transcript test/fixtures/sample-tra
 実行ログ:
 - 主要ステージ（`[1/4]` から `[4/4]`）は常時表示
 - `--verbose` は将来の詳細デバッグログ拡張用フラグ
+
+LLMプロバイダー切替:
+- `LLM_PROVIDER=bedrock`（デフォルト）: Bedrock Converse APIを使用
+- `LLM_PROVIDER=openrouter`: OpenRouter Chat Completions APIを使用
 
 ## 開発
 ```bash

@@ -44,7 +44,10 @@
   - 変更: `src/config/index.ts` に provider切替とOpenRouter必須値の検証を追加
 - [x] M2: 構造化サービスのプロバイダー分岐実装
   - 変更: `src/services/structuring.ts` に Bedrock/OpenRouter分岐とOpenRouterリトライ実装を追加
-- [ ] M3: テスト・README・.env.example更新とローカル検証
+- [x] M3: テスト・README・.env.example更新とローカル検証
+  - 変更: `test/services/structuring.test.ts`, `test/config.test.ts`, `test/pipeline/orchestrator.test.ts`, `test/services/transcription.test.ts`, `README.md`, `.env.example`
+  - 実行: `npm run build && npm run lint && npm run test`
+  - 要点: build/lint/test すべて成功（7 test files / 19 tests passed）
 - [ ] M4: PR作成・CI確認・mainマージ
 
 ## ネットワーク復旧後の手順

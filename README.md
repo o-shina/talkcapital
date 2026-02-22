@@ -100,6 +100,35 @@ LLMプロバイダー切替:
 - `LLM_PROVIDER=bedrock`（デフォルト）: Bedrock Converse APIを使用
 - `LLM_PROVIDER=openrouter`: OpenRouter Chat Completions APIを使用
 
+## ストリーミングモード
+
+講演中にリアルタイム文字起こしし、500文字蓄積ごとにグラレコPNGを更新するWebサービスです。
+
+### 起動
+```bash
+npm run build
+npm run serve
+# http://localhost:8080 でWeb UIにアクセス
+```
+
+### 使い方
+1. ブラウザで `http://localhost:8080` を開く
+2. 「録音開始」ボタンをクリック（マイクアクセスを許可）
+3. 講演音声がリアルタイムで文字起こしされ、左パネルに表示
+4. 500文字蓄積ごとに右パネルのグラレコPNGが更新
+5. 「録音停止」で最終版グラレコが生成
+
+### 環境変数（ストリーミング用）
+| 変数 | デフォルト | 説明 |
+|------|-----------|------|
+| `PORT` | `8080` | サーバーポート |
+| `STREAMING_UPDATE_CHARS` | `500` | PNG更新の文字数閾値 |
+| `STREAMING_MAX_SESSIONS` | `1` | 同時セッション数上限 |
+
+### 追加AWS権限
+ストリーミングモードでは以下の権限が追加で必要です：
+- `transcribe:StartStreamTranscription`
+
 ## 開発
 ```bash
 npm run build
@@ -108,7 +137,15 @@ npm run test
 ```
 
 ## 講演当日のデモ手順
+
+### バッチモード
 1. 録音ファイル（m4a/mp3等）をローカルへ転送
 2. CLI実行
 3. `/tmp/test.png` など出力先で画像確認
 4. 必要なら `--skip-transcribe` で構造化以降を再実行
+
+### ストリーミングモード
+1. `npm run serve` でサーバー起動
+2. ブラウザで `http://localhost:8080` を開く
+3. 「録音開始」で講演開始、リアルタイムでグラレコ更新
+4. 「録音停止」で最終版生成

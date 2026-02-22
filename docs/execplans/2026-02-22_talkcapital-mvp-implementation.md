@@ -59,7 +59,7 @@
 - [x] M2: サービス実装（既存実装確認）
 - [x] M3: パイプライン統合とCLI（`--format` 対応を追加）
 - [x] M4: テスト・フィクスチャ・ドキュメント・CI定義（既存定義確認 + README追記）
-- [ ] M5
+- [ ] M5（外部制約により検証未完）
 
 ## 証跡ログ
 - 2026-02-22 調査:
@@ -77,6 +77,8 @@
   - `npm run test` -> `sh: vitest: command not found`（依存未導入）
   - `npx talkcapital generate ...` -> `EPERM`（`~/.npm` 権限問題）
   - `entire checkpoint -m ...` -> `unknown command "checkpoint"`（機能未提供）
+  - `gh pr create ...` -> `error connecting to api.github.com`（PR作成不可）
+  - コミット: `0c4ab04` (`M3: CLI出力フォーマット分岐と検証ログ整備 (#0)`)
 
 ## 最終サマリ（完了時更新）
 - 変更点:

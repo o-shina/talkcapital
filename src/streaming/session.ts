@@ -53,6 +53,7 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
   private lastStructuredLength = 0;
   private structuring = false;
   private pendingRetrigger = false;
+  private interimPromise: Promise<void> | null = null;
 
   constructor(config: Config, deps?: SessionDeps) {
     super();
@@ -91,6 +92,11 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
     this.emit('status', '最終版を生成中...');
     this.transcribeStream.close();
 
+    // 進行中の interim 構造化が完了するのを待つ
+    if (this.interimPromise) {
+      await this.interimPromise;
+    }
+
     if (!this.accumulatedText) {
       this.emit('close');
       return;
@@ -125,11 +131,12 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
       return;
     }
 
-    this.triggerInterimUpdate();
+    this.interimPromise = this.triggerInterimUpdate();
   }
 
   private async triggerInterimUpdate(): Promise<void> {
     this.structuring = true;
+    const prevLength = this.lastStructuredLength;
     this.lastStructuredLength = this.accumulatedText.length;
 
     try {
@@ -139,6 +146,8 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
       const png = await this.playwrightPool.exportToPng(doc);
       this.emit('graphic_update', png);
     } catch (err) {
+      // 失敗時はロールバックして再試行可能にする
+      this.lastStructuredLength = prevLength;
       this.emit(
         'error',
         err instanceof Error ? err : new Error(String(err)),
@@ -166,7 +175,7 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
     const { ConverseCommand } = await import(
       '@aws-sdk/client-bedrock-runtime'
     );
-    const { getStructuredContentJsonSchema } = await import(
+    const { getInterimStructuredContentJsonSchema } = await import(
       '../types/structured-content.js'
     );
 
@@ -190,7 +199,7 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
               name: 'structured_output',
               description: '講演の構造化データを出力する（途中版）',
               inputSchema: {
-                json: getStructuredContentJsonSchema() as any,
+                json: getInterimStructuredContentJsonSchema() as any,
               },
             },
           },

@@ -13,6 +13,7 @@ const PORT = Number(process.env.PORT ?? '8080');
 let config: Config;
 let pool: PlaywrightPool;
 let activeSessions = 0;
+const activeClosePromises = new Set<Promise<void>>();
 
 function sendJson(ws: WebSocket, msg: WsServerMessage): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -31,6 +32,7 @@ async function handleConnection(ws: WebSocket): Promise<void> {
   }
 
   let session: StreamingSession | null = null;
+  let ending = false;
 
   ws.on('message', async (data, isBinary) => {
     // バイナリ = PCM audio chunk
@@ -62,6 +64,17 @@ async function handleConnection(ws: WebSocket): Promise<void> {
       activeSessions++;
       session = new StreamingSession(config, { playwrightPool: pool });
 
+      const closePromise = new Promise<void>((resolve) => {
+        session!.on('close', () => {
+          activeSessions--;
+          session = null;
+          ending = false;
+          resolve();
+        });
+      });
+      activeClosePromises.add(closePromise);
+      closePromise.then(() => activeClosePromises.delete(closePromise));
+
       session.on('transcript_partial', (text) =>
         sendJson(ws, { type: 'transcript_partial', text }),
       );
@@ -80,10 +93,6 @@ async function handleConnection(ws: WebSocket): Promise<void> {
       session.on('error', (err) =>
         sendJson(ws, { type: 'error', message: err.message }),
       );
-      session.on('close', () => {
-        activeSessions--;
-        session = null;
-      });
 
       try {
         await session.start();
@@ -96,16 +105,18 @@ async function handleConnection(ws: WebSocket): Promise<void> {
         session = null;
       }
     } else if (msg.type === 'session_end') {
-      if (!session) {
+      if (!session || ending) {
         sendJson(ws, { type: 'error', message: 'セッションが開始されていません' });
         return;
       }
+      ending = true;
       await session.end();
     }
   });
 
   ws.on('close', async () => {
-    if (session) {
+    if (session && !ending) {
+      ending = true;
       try {
         await session.end();
       } catch {
@@ -144,6 +155,8 @@ async function main(): Promise<void> {
     console.log('Shutting down...');
     wss.close();
     server.close();
+    // 既存セッションの終了を待つ
+    await Promise.all([...activeClosePromises]);
     await pool.destroy();
     process.exit(0);
   };

@@ -67,12 +67,28 @@ describe('html-renderer', () => {
     expect(html).not.toContain('<img');
   });
 
-  test('rough.js による手描き風描画が含まれる', () => {
+  test('rough.js で多様な手描き図形が描画される', () => {
     const html = renderToHtml(sampleStructured as any);
     expect(html).toContain('<svg id="rough-canvas"');
     expect(html).toContain('rough.svg(svg)');
     expect(html).toContain('rc.rectangle');
     expect(html).toContain('rc.line');
+    expect(html).toContain('rc.path');       // banner
+    expect(html).toContain('rc.circle');      // numbered circles
+    expect(html).toContain('rc.curve');       // curved connectors
+    expect(html).toContain('rc.polygon');     // tape marks
+  });
+
+  test('hachure fillStyleが使用されている（solid一色ではない）', () => {
+    const html = renderToHtml(sampleStructured as any);
+    expect(html).toContain("fillStyle:'hachure'");
+    expect(html).toContain("fillStyle:'cross-hatch'");
+  });
+
+  test('装飾要素が含まれる（テープマーク・番号丸）', () => {
+    const html = renderToHtml(sampleStructured as any);
+    expect(html).toContain('block-number');
+    expect(html).toContain('rc.polygon');
   });
 
   test('HTMLエスケープが正しく動作する', () => {

@@ -69,14 +69,14 @@ export const LAYOUT = {
     },
   ],
   /** ブロック内のフォントサイズ */
-  blockHeadingFontSize: 36,
+  blockHeadingFontSize: 40,
   blockBulletFontSize: 26,
   /** ブロック内部のレイアウト定数 */
   blockHeadingHeight: 70,
-  blockHeadingTopInset: 20,
+  blockHeadingTopInset: 25,
   blockBulletTopOffset: 100,
   blockBulletLineHeight: 80,
-  blockBulletLeftPadding: 36,
+  blockBulletLeftPadding: 70,
   blockBulletRightPadding: 36,
   speechBubbles: [
     { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + GAP, width: BUBBLE_W, height: BUBBLE_H },

@@ -8,6 +8,22 @@ export interface RenderOptions {
   scale?: number;
 }
 
+function generateStarPoints(
+  cx: number,
+  cy: number,
+  outerR: number,
+  innerR: number,
+  points: number,
+): number[][] {
+  const pts: number[][] = [];
+  for (let i = 0; i < points * 2; i++) {
+    const angle = (Math.PI / points) * i - Math.PI / 2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    pts.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+  }
+  return pts;
+}
+
 export function renderToHtml(
   content: StructuredContent,
   options?: RenderOptions,
@@ -21,30 +37,71 @@ export function renderToHtml(
     hashVal = ((hashVal << 5) - hashVal + hashStr.charCodeAt(i)) | 0;
   }
   const rand = seededRandom(Math.abs(hashVal) + 42);
+  const seed = () => Math.floor(rand() * 100000);
 
-  // Build rough.js draw commands as JSON for client-side execution
   const roughCommands: string[] = [];
 
-  // Title box
-  roughCommands.push(`rc.rectangle(${LAYOUT.title.x}, ${LAYOUT.title.y}, ${LAYOUT.title.width}, ${LAYOUT.title.height}, {fill:'${COLORS.title.fill}', stroke:'${COLORS.title.stroke}', fillStyle:'solid', roughness:2.5, strokeWidth:3, seed:${Math.floor(rand() * 100000)}})`);
+  // ========== Title: Banner/Ribbon shape ==========
+  const tx = LAYOUT.title.x;
+  const ty = LAYOUT.title.y;
+  const tw = LAYOUT.title.width;
+  const th = LAYOUT.title.height;
+  const foldW = 40;
+  const bannerPath = `M ${tx + foldW} ${ty} L ${tx + tw - foldW} ${ty} L ${tx + tw} ${ty + th / 2} L ${tx + tw - foldW} ${ty + th} L ${tx + foldW} ${ty + th} L ${tx} ${ty + th / 2} Z`;
+  roughCommands.push(`rc.path('${bannerPath}', {fill:'${COLORS.title.bannerFill}', stroke:'${COLORS.title.bannerStroke}', fillStyle:'hachure', hachureGap:14, fillWeight:1.5, roughness:3, strokeWidth:6, bowing:2, seed:${seed()}})`);
 
-  // Main message box
-  roughCommands.push(`rc.rectangle(${LAYOUT.mainMessage.x}, ${LAYOUT.mainMessage.y}, ${LAYOUT.mainMessage.width}, ${LAYOUT.mainMessage.height}, {fill:'${COLORS.mainMessage.fill}', stroke:'${COLORS.mainMessage.stroke}', fillStyle:'solid', roughness:2, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+  // ========== Main message: hachure + underline ==========
+  roughCommands.push(`rc.rectangle(${LAYOUT.mainMessage.x}, ${LAYOUT.mainMessage.y}, ${LAYOUT.mainMessage.width}, ${LAYOUT.mainMessage.height}, {fill:'${COLORS.mainMessage.accentLight}', stroke:'${COLORS.mainMessage.stroke}', fillStyle:'hachure', hachureGap:20, fillWeight:1, roughness:3.5, strokeWidth:5, bowing:1.5, seed:${seed()}})`);
+  const mmUlY = LAYOUT.mainMessage.y + LAYOUT.mainMessage.height - 15;
+  roughCommands.push(`rc.line(${LAYOUT.mainMessage.x + 30}, ${mmUlY}, ${LAYOUT.mainMessage.x + LAYOUT.mainMessage.width - 30}, ${mmUlY}, {stroke:'${COLORS.mainMessage.stroke}', roughness:3, strokeWidth:5, seed:${seed()}})`);
 
-  // Blocks
+  // ========== Blocks: multi-layer rendering ==========
   for (let i = 0; i < resolvedBlocks.length; i++) {
     const layout = resolvedBlocks[i];
     const color = COLORS.blocks[i];
-    roughCommands.push(`rc.rectangle(${layout.x}, ${layout.y}, ${layout.width}, ${layout.height}, {fill:'${color.fill}', stroke:'${color.stroke}', fillStyle:'solid', roughness:2.5, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
 
-    // Block heading underline (hand-drawn)
-    const ulY = layout.y + 80;
-    roughCommands.push(`rc.line(${layout.x + 20}, ${ulY}, ${layout.x + layout.width - 20}, ${ulY}, {stroke:'${color.stroke}', roughness:3, strokeWidth:3, seed:${Math.floor(rand() * 100000)}})`);
+    // Layer 1: Light hachure fill (the "paper" background)
+    roughCommands.push(`rc.rectangle(${layout.x}, ${layout.y}, ${layout.width}, ${layout.height}, {fill:'${color.hachure}', stroke:'none', fillStyle:'hachure', hachureGap:24, fillWeight:1, roughness:2, strokeWidth:0, seed:${seed()}})`);
 
-    // Bullet markers are rendered inline in HTML (not SVG) to align with text flow
+    // Layer 2: Thick hand-drawn border
+    roughCommands.push(`rc.rectangle(${layout.x}, ${layout.y}, ${layout.width}, ${layout.height}, {fill:'transparent', stroke:'${color.stroke}', roughness:3.5, strokeWidth:6, bowing:2, seed:${seed()}})`);
+
+    // Layer 3: Numbered circle
+    const circleX = layout.x + 35;
+    const circleY = layout.y + 35;
+    roughCommands.push(`rc.circle(${circleX}, ${circleY}, 50, {fill:'${color.stroke}', stroke:'${color.stroke}', fillStyle:'solid', roughness:2.5, strokeWidth:3, seed:${seed()}})`);
+
+    // Layer 4: Heading underline (thick)
+    const ulY = layout.y + 85;
+    roughCommands.push(`rc.line(${layout.x + 60}, ${ulY}, ${layout.x + layout.width - 30}, ${ulY}, {stroke:'${color.stroke}', roughness:3, strokeWidth:4, seed:${seed()}})`);
+
+    // Layer 5: Tape mark at top-right corner
+    const tapeX = layout.x + layout.width - 50;
+    const tapeY = layout.y - 10;
+    const tapeW = 60;
+    const tapeH = 25;
+    const tapeAngle = (rand() - 0.5) * 0.4 + 0.15;
+    const cos = Math.cos(tapeAngle);
+    const sin = Math.sin(tapeAngle);
+    const tapePts = [
+      [tapeX, tapeY],
+      [tapeX + tapeW * cos, tapeY + tapeW * sin],
+      [tapeX + tapeW * cos - tapeH * sin, tapeY + tapeW * sin + tapeH * cos],
+      [tapeX - tapeH * sin, tapeY + tapeH * cos],
+    ];
+    roughCommands.push(`rc.polygon([${tapePts.map(p => `[${Math.round(p[0])},${Math.round(p[1])}]`).join(',')}], {fill:'${COLORS.tape}', stroke:'${COLORS.tape}', fillStyle:'solid', roughness:1.5, strokeWidth:1.5, fillWeight:2, seed:${seed()}})`);
+
+    // Layer 6: Star for high-importance blocks
+    const block = content.blocks[i];
+    if (block?.importance === 'high') {
+      const starX = layout.x + layout.width - 60;
+      const starY = layout.y + 60;
+      const starPts = generateStarPoints(starX, starY, 30, 14, 5);
+      roughCommands.push(`rc.polygon([${starPts.map(p => `[${Math.round(p[0])},${Math.round(p[1])}]`).join(',')}], {fill:'${color.stroke}', stroke:'${color.stroke}', fillStyle:'hachure', hachureGap:6, roughness:2, strokeWidth:3, seed:${seed()}})`);
+    }
   }
 
-  // Speech bubbles
+  // ========== Speech bubbles ==========
   for (let i = 0; i < content.speechBubbles.length; i++) {
     const layout = LAYOUT.speechBubbles[i];
     if (!layout) break;
@@ -52,37 +109,66 @@ export function renderToHtml(
     const bubbleStroke = bubble.emphasis
       ? COLORS.emphasis[bubble.emphasis]
       : COLORS.speechBubble.stroke;
-    roughCommands.push(`rc.ellipse(${layout.x + layout.width / 2}, ${layout.y + layout.height / 2}, ${layout.width}, ${layout.height}, {fill:'${COLORS.speechBubble.fill}', stroke:'${bubbleStroke}', fillStyle:'solid', roughness:2, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
 
-    // Speech tail
-    const tx = layout.x + layout.width * 0.35;
-    const ty = layout.y + layout.height - 10;
-    roughCommands.push(`rc.line(${tx}, ${ty}, ${tx - 20}, ${ty + 40}, {stroke:'${bubbleStroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
-    roughCommands.push(`rc.line(${tx + 30}, ${ty}, ${tx - 20}, ${ty + 40}, {stroke:'${bubbleStroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
+    roughCommands.push(`rc.ellipse(${layout.x + layout.width / 2}, ${layout.y + layout.height / 2}, ${layout.width}, ${layout.height}, {fill:'${COLORS.speechBubble.fill}', stroke:'${bubbleStroke}', fillStyle:'hachure', hachureGap:25, fillWeight:0.8, roughness:3, strokeWidth:5, bowing:2, seed:${seed()}})`);
+
+    // Curved speech tail
+    const tailX = layout.x + layout.width * 0.35;
+    const tailY = layout.y + layout.height - 10;
+    roughCommands.push(`rc.curve([[${tailX}, ${tailY}], [${tailX - 10}, ${tailY + 25}], [${tailX - 30}, ${tailY + 50}]], {stroke:'${bubbleStroke}', roughness:2, strokeWidth:4, seed:${seed()}})`);
+    roughCommands.push(`rc.curve([[${tailX + 35}, ${tailY}], [${tailX + 10}, ${tailY + 30}], [${tailX - 30}, ${tailY + 50}]], {stroke:'${bubbleStroke}', roughness:2, strokeWidth:4, seed:${seed()}})`);
   }
 
-  // Actions area
-  roughCommands.push(`rc.rectangle(${LAYOUT.actions.x}, ${LAYOUT.actions.y}, ${LAYOUT.actions.width}, ${LAYOUT.actions.height}, {fill:'${COLORS.actions.fill}', stroke:'${COLORS.actions.stroke}', fillStyle:'solid', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
+  // ========== Actions area ==========
+  roughCommands.push(`rc.rectangle(${LAYOUT.actions.x}, ${LAYOUT.actions.y}, ${LAYOUT.actions.width}, ${LAYOUT.actions.height}, {fill:'${COLORS.actions.fill}', stroke:'${COLORS.actions.stroke}', fillStyle:'cross-hatch', hachureGap:30, fillWeight:0.8, roughness:3, strokeWidth:5, bowing:1.5, seed:${seed()}})`);
 
-  // Actions underline
-  roughCommands.push(`rc.line(${LAYOUT.actions.x + 20}, ${LAYOUT.actions.y + 60}, ${LAYOUT.actions.x + LAYOUT.actions.width - 20}, ${LAYOUT.actions.y + 60}, {stroke:'${COLORS.actions.stroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
+  // Actions heading underline
+  roughCommands.push(`rc.line(${LAYOUT.actions.x + 20}, ${LAYOUT.actions.y + 60}, ${LAYOUT.actions.x + LAYOUT.actions.width - 20}, ${LAYOUT.actions.y + 60}, {stroke:'${COLORS.actions.stroke}', roughness:3, strokeWidth:4, seed:${seed()}})`);
 
-  // Action checkboxes are rendered inline in HTML (not SVG) to align with text flow
-
-  // Connector arrows (hand-drawn)
+  // ========== Connector: curved arrow ==========
   const titleEndX = LAYOUT.title.x + LAYOUT.title.width + 10;
   const titleMidY = LAYOUT.title.y + LAYOUT.title.height / 2;
   const msgStartX = LAYOUT.mainMessage.x - 10;
   const msgMidY = LAYOUT.mainMessage.y + LAYOUT.mainMessage.height / 2;
-  roughCommands.push(`rc.line(${titleEndX}, ${titleMidY}, ${msgStartX}, ${msgMidY}, {stroke:'${COLORS.connector}', roughness:1.5, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+  const ctrlX = (titleEndX + msgStartX) / 2;
+  const ctrlY = titleMidY - 40;
+  roughCommands.push(`rc.curve([[${titleEndX}, ${titleMidY}], [${ctrlX}, ${ctrlY}], [${msgStartX}, ${msgMidY}]], {stroke:'${COLORS.connector}', roughness:2, strokeWidth:4, bowing:2, seed:${seed()}})`);
   // Arrowhead
-  roughCommands.push(`rc.line(${msgStartX}, ${msgMidY}, ${msgStartX - 20}, ${msgMidY - 15}, {stroke:'${COLORS.connector}', roughness:1, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
-  roughCommands.push(`rc.line(${msgStartX}, ${msgMidY}, ${msgStartX - 20}, ${msgMidY + 15}, {stroke:'${COLORS.connector}', roughness:1, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+  roughCommands.push(`rc.line(${msgStartX}, ${msgMidY}, ${msgStartX - 25}, ${msgMidY - 18}, {stroke:'${COLORS.connector}', roughness:1.5, strokeWidth:4, seed:${seed()}})`);
+  roughCommands.push(`rc.line(${msgStartX}, ${msgMidY}, ${msgStartX - 25}, ${msgMidY + 18}, {stroke:'${COLORS.connector}', roughness:1.5, strokeWidth:4, seed:${seed()}})`);
 
-  // Vertical divider line
+  // ========== Decorative elements ==========
+  // Small decorative circles in whitespace
+  const decorSpots = [
+    { x: LAYOUT.title.x + 80, y: LAYOUT.title.y - 10 },
+    { x: CANVAS.width - 100, y: 80 },
+    { x: CANVAS.width - 150, y: CANVAS.height - 100 },
+  ];
+  for (const spot of decorSpots) {
+    const r = 10 + rand() * 15;
+    roughCommands.push(`rc.circle(${spot.x}, ${spot.y}, ${Math.round(r * 2)}, {fill:'transparent', stroke:'${COLORS.decorationLight}', roughness:3, strokeWidth:2, seed:${seed()}})`);
+  }
+
+  // Flow arrows between horizontally adjacent blocks
+  for (let i = 0; i < resolvedBlocks.length - 1; i++) {
+    const from = resolvedBlocks[i];
+    const to = resolvedBlocks[i + 1];
+    if (Math.abs(from.y - to.y) < 100) {
+      const ax = from.x + from.width + 5;
+      const ay = from.y + from.height / 2;
+      const bx = to.x - 5;
+      const by = to.y + to.height / 2;
+      const mx = (ax + bx) / 2;
+      const my = ay - 20;
+      roughCommands.push(`rc.curve([[${ax},${ay}],[${mx},${my}],[${bx},${by}]], {stroke:'${COLORS.decorationLight}', roughness:2, strokeWidth:2.5, seed:${seed()}})`);
+    }
+  }
+
+  // Vertical dashed divider
   const divX = LAYOUT.blocks[0].x + LAYOUT.blocks[0].width * 2 + 120;
-  roughCommands.push(`rc.line(${divX}, ${LAYOUT.title.y + LAYOUT.title.height + 20}, ${divX}, ${CANVAS.height - 50}, {stroke:'${COLORS.decorationLight}', roughness:2, strokeWidth:1.5, seed:${Math.floor(rand() * 100000)}, strokeLineDash:[20,15]})`);
+  roughCommands.push(`rc.line(${divX}, ${LAYOUT.title.y + LAYOUT.title.height + 20}, ${divX}, ${CANVAS.height - 50}, {stroke:'${COLORS.decorationLight}', roughness:2.5, strokeWidth:2.5, seed:${seed()}, strokeLineDash:[25,18]})`);
 
+  // ========== HTML output ==========
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -108,10 +194,6 @@ body {
   width: ${CANVAS.width}px;
   height: ${CANVAS.height}px;
 }
-.text-overlay {
-  position: absolute;
-  pointer-events: none;
-}
 .title-text {
   position: absolute;
   left: ${LAYOUT.title.x}px;
@@ -121,11 +203,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 48px;
+  font-size: 56px;
   font-weight: 600;
   text-align: center;
   line-height: 1.15;
-  padding: 0 20px;
+  padding: 0 50px;
+  letter-spacing: 2px;
 }
 .main-message-text {
   position: absolute;
@@ -149,9 +232,9 @@ body {
 .block-heading {
   font-size: ${LAYOUT.blockHeadingFontSize}px;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   line-height: 1.2;
-  padding-bottom: 8px;
+  padding-bottom: 10px;
 }
 .block-illustration {
   float: left;
@@ -176,11 +259,25 @@ body {
 }
 .bullet-dot {
   display: inline-block;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
+  border: 3px solid;
+  background: transparent;
   flex-shrink: 0;
   margin-top: 14px;
+}
+.block-number {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 600;
+  color: #fff;
+  pointer-events: none;
 }
 .bubble-text {
   position: absolute;
@@ -215,25 +312,14 @@ body {
   margin-bottom: 18px;
   font-size: ${LAYOUT.actions.itemFontSize}px;
   line-height: 1.4;
-}
-.action-checkbox {
-  display: inline-block;
-  width: 32px;
-  height: 32px;
-  border: 2.5px solid ${COLORS.actions.stroke};
-  border-radius: 3px;
-  flex-shrink: 0;
-  margin-top: 4px;
-  transform: rotate(-1deg);
+  padding-left: 50px;
 }
 </style>
 </head>
 <body>
 
-<!-- rough.js draws all shapes here -->
 <svg id="rough-canvas" viewBox="0 0 ${CANVAS.width} ${CANVAS.height}"></svg>
 
-<!-- Text overlays (crisp text on top of sketchy shapes) -->
 <div class="title-text">${escapeHtml(content.title)}</div>
 <div class="main-message-text">${escapeHtml(content.mainMessage)}</div>
 
@@ -241,11 +327,14 @@ ${content.blocks.map((block, i) => {
   const layout = resolvedBlocks[i];
   const color = COLORS.blocks[i];
   const illust = illustrations?.get(i);
-  return `<div class="block-text" style="left:${layout.x}px;top:${layout.y}px;width:${layout.width}px;height:${layout.height}px;">
+  const circleX = layout.x + 35;
+  const circleY = layout.y + 35;
+  return `<div class="block-number" style="left:${circleX - 25}px;top:${circleY - 25}px;">${i + 1}</div>
+<div class="block-text" style="left:${layout.x}px;top:${layout.y}px;width:${layout.width}px;height:${layout.height}px;">
   <div class="block-heading" style="color:${color.stroke}">${escapeHtml(block.heading)}</div>
   ${illust ? `<img class="block-illustration" src="${illust}" alt="">` : ''}
   <ul class="block-bullet-list">
-    ${block.bullets.map(b => `<li><span class="bullet-dot" style="background:${color.stroke}"></span>${escapeHtml(b.text)}</li>`).join('\n    ')}
+    ${block.bullets.map(b => `<li><span class="bullet-dot" style="border-color:${color.stroke}"></span>${escapeHtml(b.text)}</li>`).join('\n    ')}
   </ul>
 </div>`;
 }).join('\n')}
@@ -260,7 +349,7 @@ ${content.speechBubbles.map((bubble, i) => {
 
 <div class="actions-text">
   <div class="actions-header">今日からできるアクション</div>
-  ${content.actions.map(action => `<div class="action-item"><span class="action-checkbox"></span>${escapeHtml(action.text)}</div>`).join('\n  ')}
+  ${content.actions.map(action => `<div class="action-item">${escapeHtml(action.text)}</div>`).join('\n  ')}
 </div>
 
 <script>

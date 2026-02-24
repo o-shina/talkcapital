@@ -26,6 +26,12 @@ export interface Config {
     updateChars: number;
     maxSessions: number;
   };
+  illustration: {
+    enabled: boolean;
+    modelId: string;
+    region: string;
+    iconSize: number;
+  };
 }
 
 let loaded = false;
@@ -85,6 +91,12 @@ export function loadConfig(): Config {
       port: Number(process.env.PORT ?? '8080'),
       updateChars: Number(process.env.STREAMING_UPDATE_CHARS ?? '500'),
       maxSessions: Number(process.env.STREAMING_MAX_SESSIONS ?? '1'),
+    },
+    illustration: {
+      enabled: process.env.ILLUSTRATION_ENABLED !== 'false',
+      modelId: process.env.BEDROCK_IMAGE_MODEL_ID ?? 'amazon.nova-canvas-v1:0',
+      region: process.env.BEDROCK_IMAGE_REGION ?? 'us-east-1',
+      iconSize: Number(process.env.ILLUSTRATION_ICON_SIZE ?? '100'),
     },
   };
 }

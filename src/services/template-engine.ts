@@ -1,13 +1,25 @@
 import { nanoid } from 'nanoid';
 import type { StructuredContent } from '../types/structured-content.js';
-import type { ExcalidrawDocument, ExcalidrawElement, ExcalidrawShapeElement } from '../types/excalidraw.js';
+import type {
+  ExcalidrawDocument,
+  ExcalidrawElement,
+  ExcalidrawShapeElement,
+  ExcalidrawLinearElement,
+  ExcalidrawImageElement,
+  BinaryFiles,
+} from '../types/excalidraw.js';
 import { CANVAS, LAYOUT } from '../templates/layout.js';
 import { COLORS, STYLE } from '../templates/colors.js';
+import { resolveBlockLayouts } from '../templates/layout-presets.js';
 
-export function renderToExcalidraw(content: StructuredContent): ExcalidrawDocument {
+export function renderToExcalidraw(content: StructuredContent, files?: BinaryFiles): ExcalidrawDocument {
   const elements: ExcalidrawElement[] = [];
+  const hasIcons = files && Object.keys(files).length > 0;
 
+  // --- タイトル ---
   elements.push(...buildBoundBoxWithText(LAYOUT.title, content.title, COLORS.title.fill, COLORS.title.stroke));
+
+  // --- メインメッセージ ---
   elements.push(
     ...buildBoundBoxWithText(
       LAYOUT.mainMessage,
@@ -17,27 +29,93 @@ export function renderToExcalidraw(content: StructuredContent): ExcalidrawDocume
     ),
   );
 
+  // --- タイトル→メインメッセージの接続矢印 ---
+  elements.push(
+    createArrow({
+      x: LAYOUT.title.x + LAYOUT.title.width + 10,
+      y: LAYOUT.title.y + LAYOUT.title.height / 2,
+      points: [
+        [0, 0],
+        [LAYOUT.mainMessage.x - LAYOUT.title.x - LAYOUT.title.width - 20, 0],
+      ],
+      stroke: COLORS.connector,
+      strokeWidth: 1.5,
+      endArrowhead: 'arrow',
+    }),
+  );
+
+  // --- ブロック（最大4個、ジッター＋重要度サイズ適用） ---
+  const resolvedBlocks = resolveBlockLayouts(content, LAYOUT.blocks);
+
   for (let i = 0; i < LAYOUT.blocks.length; i += 1) {
-    const layout = LAYOUT.blocks[i];
+    const layout = resolvedBlocks[i];
     const color = COLORS.blocks[i];
     const block = content.blocks[i];
+
+    // ブロック背景矩形 + 見出し
     elements.push(
       ...buildBoundBoxWithText(layout, block?.heading ?? '', color.fill, color.stroke, {
-        fontSize: 28,
+        fontSize: LAYOUT.blockHeadingFontSize,
         textAlign: 'left',
       }),
     );
 
     if (block) {
+      // アイコン画像の配置（ファイルがある場合）
+      const iconFileId = hasIcons ? findFileIdForBlock(files, i) : undefined;
+      const iconOffset = iconFileId ? 110 : 0; // アイコンがある場合はテキストを右にオフセット
+
+      if (iconFileId) {
+        elements.push(
+          createImage({
+            x: layout.x + 12,
+            y: layout.y + 70,
+            width: 96,
+            height: 96,
+            fileId: iconFileId,
+          }),
+        );
+      }
+
+      // 見出し下のアンダーライン
+      elements.push(
+        createLine({
+          x: layout.x + 16,
+          y: layout.y + 68,
+          points: [
+            [0, 0],
+            [layout.width - 32, 0],
+          ],
+          stroke: color.stroke,
+          strokeWidth: 1.5,
+        }),
+      );
+
+      // 箇条書き
       block.bullets.forEach((bullet, bulletIndex) => {
+        const bulletY = layout.y + 88 + bulletIndex * 64;
+
+        // 塗り円のバレットマーカー
+        elements.push(
+          createEllipse({
+            x: layout.x + 24 + iconOffset,
+            y: bulletY + 8,
+            width: 8,
+            height: 8,
+            fill: color.stroke,
+            stroke: color.stroke,
+          }),
+        );
+
+        // バレットテキスト
         elements.push(
           createText({
-            x: layout.x + 24,
-            y: layout.y + 80 + bulletIndex * 64,
-            width: layout.width - 48,
+            x: layout.x + 40 + iconOffset,
+            y: bulletY,
+            width: layout.width - 64 - iconOffset,
             height: 56,
-            text: `・${bullet.text}`,
-            fontSize: 24,
+            text: bullet.text,
+            fontSize: LAYOUT.blockBulletFontSize,
             textAlign: 'left',
           }),
         );
@@ -45,17 +123,46 @@ export function renderToExcalidraw(content: StructuredContent): ExcalidrawDocume
     }
   }
 
+  // --- 吹き出し（最大4個） ---
   for (let i = 0; i < content.speechBubbles.length; i += 1) {
     const bubble = content.speechBubbles[i];
     const layout = LAYOUT.speechBubbles[i];
     if (!layout) {
       break;
     }
+
+    // emphasisに応じたストローク色
+    const bubbleStroke = bubble.emphasis
+      ? COLORS.emphasis[bubble.emphasis]
+      : COLORS.speechBubble.stroke;
+
     elements.push(
-      ...buildEllipseWithText(layout, `"${bubble.quote}"`, COLORS.speechBubble.fill, COLORS.speechBubble.stroke),
+      ...buildEllipseWithText(
+        layout,
+        `"${bubble.quote}"`,
+        COLORS.speechBubble.fill,
+        bubbleStroke,
+        { fontSize: LAYOUT.speechBubbleFontSize },
+      ),
+    );
+
+    // 吹き出しのしっぽ（小さな三角形風のライン）
+    elements.push(
+      createLine({
+        x: layout.x + layout.width * 0.3,
+        y: layout.y + layout.height,
+        points: [
+          [0, 0],
+          [-12, 20],
+          [12, 16],
+        ],
+        stroke: bubbleStroke,
+        strokeWidth: 1.5,
+      }),
     );
   }
 
+  // --- アクションエリア ---
   elements.push(
     ...buildBoundBoxWithText(
       {
@@ -71,8 +178,24 @@ export function renderToExcalidraw(content: StructuredContent): ExcalidrawDocume
     ),
   );
 
+  // アクションヘッダー下のアンダーライン
+  elements.push(
+    createLine({
+      x: LAYOUT.actions.x + 20,
+      y: LAYOUT.actions.y + 72,
+      points: [
+        [0, 0],
+        [LAYOUT.actions.width - 40, 0],
+      ],
+      stroke: COLORS.actions.stroke,
+      strokeWidth: 1,
+    }),
+  );
+
   content.actions.forEach((action, actionIndex) => {
     const y = LAYOUT.actions.y + 96 + actionIndex * 82;
+
+    // チェックボックス
     elements.push(
       createRect({
         x: LAYOUT.actions.x + 28,
@@ -82,6 +205,10 @@ export function renderToExcalidraw(content: StructuredContent): ExcalidrawDocume
         fill: '#ffffff',
         stroke: COLORS.actions.stroke,
       }),
+    );
+
+    // アクションテキスト
+    elements.push(
       createText({
         x: LAYOUT.actions.x + 72,
         y: y - 8,
@@ -94,11 +221,41 @@ export function renderToExcalidraw(content: StructuredContent): ExcalidrawDocume
     );
   });
 
+  // --- メインメッセージ→アクションエリアへの点線矢印 ---
+  elements.push(
+    createArrow({
+      x: LAYOUT.actions.x + LAYOUT.actions.width / 2,
+      y: LAYOUT.mainMessage.y + LAYOUT.mainMessage.height + 8,
+      points: [
+        [0, 0],
+        [0, LAYOUT.actions.y - LAYOUT.mainMessage.y - LAYOUT.mainMessage.height - 16],
+      ],
+      stroke: COLORS.connector,
+      strokeWidth: 1,
+      endArrowhead: 'arrow',
+    }),
+  );
+
+  // --- ブロックエリアとサイドエリアの区切り線 ---
+  elements.push(
+    createLine({
+      x: 920,
+      y: 130,
+      points: [
+        [0, 0],
+        [0, 700],
+      ],
+      stroke: COLORS.decorationLight,
+      strokeWidth: 1,
+    }),
+  );
+
   return {
     type: 'excalidraw',
     version: 2,
     source: 'https://talkcapital.local',
     elements,
+    ...(hasIcons ? { files } : {}),
     appState: {
       viewBackgroundColor: COLORS.canvas,
       width: CANVAS.width,
@@ -106,6 +263,16 @@ export function renderToExcalidraw(content: StructuredContent): ExcalidrawDocume
     },
   };
 }
+
+/** BinaryFiles辞書からブロックインデックスに対応するfileIdを検索 */
+function findFileIdForBlock(files: BinaryFiles, blockIndex: number): string | undefined {
+  const prefix = `icon-block-${blockIndex}-`;
+  return Object.keys(files).find((key) => key.startsWith(prefix));
+}
+
+// ──────────────────────────────────────────
+// ビルダー関数
+// ──────────────────────────────────────────
 
 function buildBoundBoxWithText(
   layout: { x: number; y: number; width: number; height: number; fontSize?: number; textAlign?: 'left' | 'center' | 'right' },
@@ -141,6 +308,7 @@ function buildEllipseWithText(
   text: string,
   fill: string,
   stroke: string,
+  options?: { fontSize?: number },
 ): ExcalidrawElement[] {
   const ellipse = createEllipse({
     x: layout.x,
@@ -156,13 +324,17 @@ function buildEllipseWithText(
     width: layout.width - 48,
     height: layout.height - 40,
     text,
-    fontSize: 22,
+    fontSize: options?.fontSize ?? 22,
     textAlign: 'center',
     containerId: ellipse.id,
   });
   (ellipse as ExcalidrawShapeElement).boundElements = [{ type: 'text', id: textElement.id }];
   return [ellipse, textElement];
 }
+
+// ──────────────────────────────────────────
+// プリミティブ要素生成
+// ──────────────────────────────────────────
 
 function createRect(input: {
   x: number;
@@ -236,6 +408,90 @@ function createText(input: {
     strokeColor: COLORS.text,
     backgroundColor: 'transparent',
     strokeWidth: 1,
+    roughness: 0,
+  };
+}
+
+function createArrow(input: {
+  x: number;
+  y: number;
+  points: [number, number][];
+  stroke: string;
+  strokeWidth: number;
+  endArrowhead: 'arrow' | 'bar' | 'dot' | 'triangle' | null;
+}): ExcalidrawLinearElement {
+  // bounding box from points
+  const xs = input.points.map((p) => p[0]);
+  const ys = input.points.map((p) => p[1]);
+  const w = Math.max(1, Math.max(...xs) - Math.min(...xs));
+  const h = Math.max(1, Math.max(...ys) - Math.min(...ys));
+
+  return {
+    id: nanoid(),
+    type: 'arrow',
+    x: input.x,
+    y: input.y,
+    width: w,
+    height: h,
+    points: input.points,
+    startArrowhead: null,
+    endArrowhead: input.endArrowhead,
+    strokeColor: input.stroke,
+    backgroundColor: 'transparent',
+    strokeWidth: input.strokeWidth,
+    roughness: STYLE.roughness,
+  };
+}
+
+function createLine(input: {
+  x: number;
+  y: number;
+  points: [number, number][];
+  stroke: string;
+  strokeWidth: number;
+}): ExcalidrawLinearElement {
+  const xs = input.points.map((p) => p[0]);
+  const ys = input.points.map((p) => p[1]);
+  const w = Math.max(1, Math.max(...xs) - Math.min(...xs));
+  const h = Math.max(1, Math.max(...ys) - Math.min(...ys));
+
+  return {
+    id: nanoid(),
+    type: 'line',
+    x: input.x,
+    y: input.y,
+    width: w,
+    height: h,
+    points: input.points,
+    startArrowhead: null,
+    endArrowhead: null,
+    strokeColor: input.stroke,
+    backgroundColor: 'transparent',
+    strokeWidth: input.strokeWidth,
+    roughness: STYLE.roughness,
+  };
+}
+
+function createImage(input: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fileId: string;
+}): ExcalidrawImageElement {
+  return {
+    id: nanoid(),
+    type: 'image',
+    x: input.x,
+    y: input.y,
+    width: input.width,
+    height: input.height,
+    fileId: input.fileId,
+    status: 'saved',
+    scale: [1, 1],
+    strokeColor: 'transparent',
+    backgroundColor: 'transparent',
+    strokeWidth: 0,
     roughness: 0,
   };
 }

@@ -11,6 +11,17 @@ export const COLORS = {
   speechBubble: { fill: '#fff9db', stroke: '#f59f00' },
   actions: { fill: '#f3f0ff', stroke: '#7048e8' },
   text: '#212529',
+  /** emphasis別のアクセントカラー（吹き出しストローク用） */
+  emphasis: {
+    important: '#e03131',
+    surprising: '#f08c00',
+    humorous: '#2f9e44',
+    inspiring: '#1971c2',
+  },
+  /** 装飾用の薄いグレー */
+  decorationLight: '#ced4da',
+  /** コネクタ矢印用 */
+  connector: '#868e96',
 } as const;
 
 export const STYLE = {

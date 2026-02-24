@@ -1,4 +1,4 @@
-export type ExcalidrawElementType = 'rectangle' | 'text' | 'ellipse';
+export type ExcalidrawElementType = 'rectangle' | 'text' | 'ellipse' | 'arrow' | 'line' | 'image';
 
 export interface ExcalidrawBoundElement {
   type: 'text';
@@ -36,13 +36,43 @@ export interface ExcalidrawTextElement extends ExcalidrawBaseElement {
   containerId?: string;
 }
 
-export type ExcalidrawElement = ExcalidrawShapeElement | ExcalidrawTextElement;
+export interface ExcalidrawLinearElement extends ExcalidrawBaseElement {
+  type: 'arrow' | 'line';
+  points: [number, number][];
+  startArrowhead: 'arrow' | 'bar' | 'dot' | 'triangle' | null;
+  endArrowhead: 'arrow' | 'bar' | 'dot' | 'triangle' | null;
+}
+
+export interface ExcalidrawImageElement extends ExcalidrawBaseElement {
+  type: 'image';
+  fileId: string;
+  status: 'pending' | 'saved' | 'error';
+  scale: [number, number];
+}
+
+export type ExcalidrawElement =
+  | ExcalidrawShapeElement
+  | ExcalidrawTextElement
+  | ExcalidrawLinearElement
+  | ExcalidrawImageElement;
+
+/** Excalidraw の BinaryFileData 型 */
+export interface BinaryFileData {
+  mimeType: 'image/png' | 'image/jpeg' | 'image/svg+xml' | 'image/webp' | 'image/gif';
+  id: string;
+  dataURL: string;
+  created: number;
+}
+
+/** fileId → BinaryFileData のマップ */
+export type BinaryFiles = Record<string, BinaryFileData>;
 
 export interface ExcalidrawDocument {
   type: 'excalidraw';
   version: 2;
   source: string;
   elements: ExcalidrawElement[];
+  files?: BinaryFiles;
   appState: {
     viewBackgroundColor: string;
     width: number;

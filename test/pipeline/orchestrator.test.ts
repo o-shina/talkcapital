@@ -22,6 +22,9 @@ vi.mock('../../src/services/template-engine.js', () => ({
 vi.mock('../../src/services/exporter.js', () => ({
   exportToPng: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../../src/services/illustration.js', () => ({
+  generateBlockIcons: vi.fn().mockResolvedValue({}),
+}));
 
 import { runPipeline } from '../../src/pipeline/orchestrator.js';
 import { exportToPng } from '../../src/services/exporter.js';
@@ -31,6 +34,7 @@ const config = {
   llm: { provider: 'bedrock' as const },
   bedrock: { region: 'us-east-1', modelId: 'model' },
   output: { scale: 2 },
+  illustration: { enabled: false, modelId: 'amazon.nova-canvas-v1:0', region: 'us-east-1', iconSize: 100 },
 };
 
 describe('orchestrator', () => {
@@ -103,9 +107,10 @@ describe('orchestrator', () => {
       config,
     );
 
-    expect(stdoutSpy).toHaveBeenCalledWith('[1/4] 文字起こしスキップ: 既存ファイルを読み込み\n');
-    expect(stdoutSpy).toHaveBeenCalledWith('[2/4] Bedrock 構造化中...\n');
-    expect(stdoutSpy).toHaveBeenCalledWith('[3/4] テンプレート描画中...\n');
-    expect(stdoutSpy).toHaveBeenCalledWith('[4/4] PNG エクスポート 中...\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[1/5] 文字起こしスキップ: 既存ファイルを読み込み\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[2/5] Bedrock 構造化中...\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[3/5] アイコン生成スキップ\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[4/5] テンプレート描画中...\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[5/5] PNG エクスポート 中...\n');
   });
 });

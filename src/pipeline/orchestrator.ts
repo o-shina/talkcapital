@@ -5,7 +5,9 @@ import { transcribeAudio } from '../services/transcription.js';
 import { structureTranscript } from '../services/structuring.js';
 import { renderToExcalidraw } from '../services/template-engine.js';
 import { exportToPng } from '../services/exporter.js';
+import { generateBlockIcons } from '../services/illustration.js';
 import type { StructuredContent } from '../types/structured-content.js';
+import type { BinaryFiles } from '../types/excalidraw.js';
 
 export interface PipelineOptions {
   inputAudioPath?: string;
@@ -29,31 +31,42 @@ export async function runPipeline(options: PipelineOptions, config: Config): Pro
 
   let transcript: string;
   if (options.transcriptOverride) {
-    logStage('[1/4] 文字起こしスキップ: 既存ファイルを読み込み');
+    logStage('[1/5] 文字起こしスキップ: 既存ファイルを読み込み');
     transcript = await readFile(options.transcriptOverride, 'utf8');
     timings.transcription = Date.now() - stageStart;
   } else {
     if (!options.inputAudioPath) {
       throw new Error('--input または --skip-transcribe + --transcript を指定してください');
     }
-    logStage('[1/4] Transcribe 実行中...');
+    logStage('[1/5] Transcribe 実行中...');
     const started = Date.now();
     transcript = await transcribeAudio(options.inputAudioPath, config);
     timings.transcription = Date.now() - started;
   }
 
-  logStage('[2/4] Bedrock 構造化中...');
+  logStage('[2/5] Bedrock 構造化中...');
   const structureStarted = Date.now();
   const structured = await structureTranscript(transcript, config);
   timings.structuring = Date.now() - structureStarted;
 
-  logStage('[3/4] テンプレート描画中...');
+  // アイコン生成（有効時のみ）
+  let iconFiles: BinaryFiles = {};
+  if (config.illustration.enabled) {
+    logStage('[3/5] アイコン生成中...');
+    const illustrationStarted = Date.now();
+    iconFiles = await generateBlockIcons(structured, config);
+    timings.illustration = Date.now() - illustrationStarted;
+  } else {
+    logStage('[3/5] アイコン生成スキップ');
+  }
+
+  logStage('[4/5] テンプレート描画中...');
   const templateStarted = Date.now();
-  const excalidrawDoc = renderToExcalidraw(structured);
+  const excalidrawDoc = renderToExcalidraw(structured, iconFiles);
   timings.template = Date.now() - templateStarted;
 
   const outputFormat = options.outputFormat ?? 'png';
-  logStage(`[4/4] ${outputFormat === 'png' ? 'PNG エクスポート' : 'Excalidraw JSON 保存'} 中...`);
+  logStage(`[5/5] ${outputFormat === 'png' ? 'PNG エクスポート' : 'Excalidraw JSON 保存'} 中...`);
   const exportStarted = Date.now();
   if (outputFormat === 'png') {
     await exportToPng(excalidrawDoc, options.outputPath, options.scale ?? config.output.scale);

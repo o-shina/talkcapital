@@ -82,6 +82,8 @@ export class PlaywrightPool {
     this.page = await this.browser.newPage();
     const htmlPath = resolve(process.cwd(), 'export/index.html');
     await this.page.goto(`file://${htmlPath}`);
+    // バンドルがESモジュールなので、renderAndExport が定義されるまで待つ
+    await this.page.waitForFunction(() => typeof (window as any).renderAndExport === 'function', null, { timeout: 15000 });
     this.renderCount = 0;
   }
 

@@ -26,8 +26,6 @@ const BUBBLE_W = 3840 - BUBBLE_AREA_X - PADDING; // ~1300
 const BUBBLE_H = 180;
 const BUBBLE_GAP = 30;
 
-// アクションエリア
-const ACTIONS_Y = PADDING + TITLE_H + BLOCK_GAP + BLOCK_H * 2 + BLOCK_GAP * 2 + 20;
 
 export const LAYOUT = {
   title: {

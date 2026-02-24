@@ -4,11 +4,9 @@ import { loadConfig } from '../src/config/index.js';
 describe('config', () => {
   test('AWS_S3_BUCKET未設定時にエラー', () => {
     const original = process.env.AWS_S3_BUCKET;
-    delete process.env.AWS_S3_BUCKET;
+    process.env.AWS_S3_BUCKET = '';
     expect(() => loadConfig()).toThrow('AWS_S3_BUCKET');
-    if (original) {
-      process.env.AWS_S3_BUCKET = original;
-    }
+    process.env.AWS_S3_BUCKET = original ?? '';
   });
 
   test('必須設定がある場合にConfigを返す', () => {

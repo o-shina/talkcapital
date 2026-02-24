@@ -6,8 +6,8 @@ describe('template-engine', () => {
   test('3ブロックでExcalidrawドキュメントを生成できる', () => {
     const doc = renderToExcalidraw(sampleStructured as any);
     expect(doc.type).toBe('excalidraw');
-    expect(doc.appState.width).toBe(1920);
-    expect(doc.appState.height).toBe(1080);
+    expect(doc.appState.width).toBe(3840);
+    expect(doc.appState.height).toBe(2160);
     expect(doc.elements.length).toBeGreaterThan(0);
 
     const ids = doc.elements.map((e) => e.id);

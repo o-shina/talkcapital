@@ -8,6 +8,7 @@ const mockConfig: Config = {
   llm: { provider: 'bedrock' as const },
   bedrock: { modelId: 'anthropic.claude-sonnet-4-20250514-v1:0', region: 'us-east-1' },
   output: { scale: 2 },
+  illustration: { enabled: false, modelId: 'amazon.nova-canvas-v1:0', region: 'us-east-1', iconSize: 100 },
 };
 
 function createMockTranscribeStream() {

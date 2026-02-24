@@ -42,7 +42,7 @@ export function loadConfig(): Config {
     loaded = true;
   }
 
-  const s3Bucket = process.env.AWS_S3_BUCKET;
+  const s3Bucket = process.env.AWS_S3_BUCKET?.trim() || '';
   if (!s3Bucket) {
     throw new Error('環境変数 AWS_S3_BUCKET は必須です');
   }

@@ -52,56 +52,73 @@ export function renderToExcalidraw(content: StructuredContent, files?: BinaryFil
     const color = COLORS.blocks[i];
     const block = content.blocks[i];
 
-    // ブロック背景矩形 + 見出し
+    // ブロック背景矩形
     elements.push(
-      ...buildBoundBoxWithText(layout, block?.heading ?? '', color.fill, color.stroke, {
-        fontSize: LAYOUT.blockHeadingFontSize,
-        textAlign: 'left',
+      createRect({
+        x: layout.x,
+        y: layout.y,
+        width: layout.width,
+        height: layout.height,
+        fill: color.fill,
+        stroke: color.stroke,
       }),
     );
 
     if (block) {
       // アイコン画像の配置（ファイルがある場合）
       const iconFileId = hasIcons ? findFileIdForBlock(files, i) : undefined;
-      const iconOffset = iconFileId ? 110 : 0; // アイコンがある場合はテキストを右にオフセット
+      const iconOffset = iconFileId ? 120 : 0;
 
       if (iconFileId) {
         elements.push(
           createImage({
-            x: layout.x + 12,
-            y: layout.y + 70,
-            width: 96,
-            height: 96,
+            x: layout.x + 20,
+            y: layout.y + LAYOUT.blockBulletTopOffset + 10,
+            width: 100,
+            height: 100,
             fileId: iconFileId,
           }),
         );
       }
 
+      // 見出しテキスト（ブロック上部）
+      elements.push(
+        createText({
+          x: layout.x + LAYOUT.blockBulletLeftPadding,
+          y: layout.y + LAYOUT.blockHeadingTopInset,
+          width: layout.width - LAYOUT.blockBulletLeftPadding * 2,
+          height: LAYOUT.blockHeadingHeight,
+          text: block.heading,
+          fontSize: LAYOUT.blockHeadingFontSize,
+          textAlign: 'left',
+        }),
+      );
+
       // 見出し下のアンダーライン
       elements.push(
         createLine({
-          x: layout.x + 16,
-          y: layout.y + 68,
+          x: layout.x + 20,
+          y: layout.y + LAYOUT.blockBulletTopOffset - 10,
           points: [
             [0, 0],
-            [layout.width - 32, 0],
+            [layout.width - 40, 0],
           ],
           stroke: color.stroke,
           strokeWidth: 1.5,
         }),
       );
 
-      // 箇条書き
+      // 箇条書き（見出しの下に配置）
       block.bullets.forEach((bullet, bulletIndex) => {
-        const bulletY = layout.y + 88 + bulletIndex * 64;
+        const bulletY = layout.y + LAYOUT.blockBulletTopOffset + bulletIndex * LAYOUT.blockBulletLineHeight;
 
         // 塗り円のバレットマーカー
         elements.push(
           createEllipse({
-            x: layout.x + 24 + iconOffset,
-            y: bulletY + 8,
-            width: 8,
-            height: 8,
+            x: layout.x + LAYOUT.blockBulletLeftPadding + iconOffset,
+            y: bulletY + 12,
+            width: 10,
+            height: 10,
             fill: color.stroke,
             stroke: color.stroke,
           }),
@@ -110,10 +127,10 @@ export function renderToExcalidraw(content: StructuredContent, files?: BinaryFil
         // バレットテキスト
         elements.push(
           createText({
-            x: layout.x + 40 + iconOffset,
+            x: layout.x + LAYOUT.blockBulletLeftPadding + 20 + iconOffset,
             y: bulletY,
-            width: layout.width - 64 - iconOffset,
-            height: 56,
+            width: layout.width - LAYOUT.blockBulletLeftPadding - LAYOUT.blockBulletRightPadding - 20 - iconOffset,
+            height: LAYOUT.blockBulletLineHeight,
             text: bullet.text,
             fontSize: LAYOUT.blockBulletFontSize,
             textAlign: 'left',
@@ -164,25 +181,33 @@ export function renderToExcalidraw(content: StructuredContent, files?: BinaryFil
 
   // --- アクションエリア ---
   elements.push(
-    ...buildBoundBoxWithText(
-      {
-        x: LAYOUT.actions.x,
-        y: LAYOUT.actions.y,
-        width: LAYOUT.actions.width,
-        height: LAYOUT.actions.height,
-      },
-      '今日からできるアクション',
-      COLORS.actions.fill,
-      COLORS.actions.stroke,
-      { fontSize: LAYOUT.actions.headerFontSize, textAlign: 'left', topInset: 24 },
-    ),
+    createRect({
+      x: LAYOUT.actions.x,
+      y: LAYOUT.actions.y,
+      width: LAYOUT.actions.width,
+      height: LAYOUT.actions.height,
+      fill: COLORS.actions.fill,
+      stroke: COLORS.actions.stroke,
+    }),
+  );
+
+  elements.push(
+    createText({
+      x: LAYOUT.actions.x + 30,
+      y: LAYOUT.actions.y + 24,
+      width: LAYOUT.actions.width - 60,
+      height: 50,
+      text: '今日からできるアクション',
+      fontSize: LAYOUT.actions.headerFontSize,
+      textAlign: 'left',
+    }),
   );
 
   // アクションヘッダー下のアンダーライン
   elements.push(
     createLine({
       x: LAYOUT.actions.x + 20,
-      y: LAYOUT.actions.y + 72,
+      y: LAYOUT.actions.y + 85,
       points: [
         [0, 0],
         [LAYOUT.actions.width - 40, 0],
@@ -193,7 +218,7 @@ export function renderToExcalidraw(content: StructuredContent, files?: BinaryFil
   );
 
   content.actions.forEach((action, actionIndex) => {
-    const y = LAYOUT.actions.y + 96 + actionIndex * 82;
+    const y = LAYOUT.actions.y + 110 + actionIndex * 110;
 
     // チェックボックス
     elements.push(
@@ -239,11 +264,11 @@ export function renderToExcalidraw(content: StructuredContent, files?: BinaryFil
   // --- ブロックエリアとサイドエリアの区切り線 ---
   elements.push(
     createLine({
-      x: 920,
-      y: 130,
+      x: LAYOUT.speechBubbles[0].x - 40,
+      y: LAYOUT.title.y + LAYOUT.title.height + 10,
       points: [
         [0, 0],
-        [0, 700],
+        [0, CANVAS.height - LAYOUT.title.y * 2 - LAYOUT.title.height - 20],
       ],
       stroke: COLORS.decorationLight,
       strokeWidth: 1,

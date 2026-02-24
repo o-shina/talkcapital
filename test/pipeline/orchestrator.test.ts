@@ -10,20 +10,14 @@ vi.mock('../../src/services/transcription.js', () => ({
 vi.mock('../../src/services/structuring.js', () => ({
   structureTranscript: vi.fn().mockResolvedValue(sampleStructured),
 }));
-vi.mock('../../src/services/template-engine.js', () => ({
-  renderToExcalidraw: vi.fn().mockReturnValue({
-    type: 'excalidraw',
-    version: 2,
-    source: 'test',
-    appState: { width: 1920, height: 1080, viewBackgroundColor: '#fff' },
-    elements: [],
-  }),
+vi.mock('../../src/services/html-renderer.js', () => ({
+  renderToHtml: vi.fn().mockReturnValue('<html><body>test</body></html>'),
 }));
 vi.mock('../../src/services/exporter.js', () => ({
   exportToPng: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../src/services/illustration.js', () => ({
-  generateBlockIcons: vi.fn().mockResolvedValue({}),
+  generateBlockIcons: vi.fn().mockResolvedValue(new Map()),
 }));
 
 import { runPipeline } from '../../src/pipeline/orchestrator.js';
@@ -34,7 +28,7 @@ const config = {
   llm: { provider: 'bedrock' as const },
   bedrock: { region: 'us-east-1', modelId: 'model' },
   output: { scale: 2 },
-  illustration: { enabled: false, modelId: 'amazon.nova-canvas-v1:0', region: 'us-east-1', iconSize: 100 },
+  illustration: { enabled: false, modelId: 'amazon.nova-canvas-v1:0', region: 'us-east-1', iconSize: 512 },
 };
 
 describe('orchestrator', () => {
@@ -76,22 +70,22 @@ describe('orchestrator', () => {
     ).rejects.toThrow('--input または --skip-transcribe');
   });
 
-  test('format=excalidraw でJSONを保存する', async () => {
+  test('format=html でHTMLを保存する', async () => {
     const transcriptFile = join(tmpdir(), `sample-${Date.now()}.txt`);
-    const outputJson = join(tmpdir(), `out-${Date.now()}.json`);
+    const outputHtml = join(tmpdir(), `out-${Date.now()}.html`);
     await writeFile(transcriptFile, 'sample transcript', 'utf8');
 
     await runPipeline(
       {
         transcriptOverride: transcriptFile,
-        outputPath: outputJson,
-        outputFormat: 'excalidraw',
+        outputPath: outputHtml,
+        outputFormat: 'html',
       },
       config,
     );
 
-    const saved = JSON.parse(await readFile(outputJson, 'utf8'));
-    expect(saved.type).toBe('excalidraw');
+    const saved = await readFile(outputHtml, 'utf8');
+    expect(saved).toContain('<html>');
     expect(vi.mocked(exportToPng)).not.toHaveBeenCalled();
   });
 
@@ -110,7 +104,7 @@ describe('orchestrator', () => {
     expect(stdoutSpy).toHaveBeenCalledWith('[1/5] 文字起こしスキップ: 既存ファイルを読み込み\n');
     expect(stdoutSpy).toHaveBeenCalledWith('[2/5] Bedrock 構造化中...\n');
     expect(stdoutSpy).toHaveBeenCalledWith('[3/5] アイコン生成スキップ\n');
-    expect(stdoutSpy).toHaveBeenCalledWith('[4/5] テンプレート描画中...\n');
+    expect(stdoutSpy).toHaveBeenCalledWith('[4/5] HTML描画中...\n');
     expect(stdoutSpy).toHaveBeenCalledWith('[5/5] PNG エクスポート 中...\n');
   });
 });

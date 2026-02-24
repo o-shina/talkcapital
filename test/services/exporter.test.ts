@@ -3,24 +3,30 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { exportToPng } from '../../src/services/exporter.js';
-import type { ExcalidrawDocument } from '../../src/types/excalidraw.js';
 
 const mocks = vi.hoisted(() => {
-  const gotoMock = vi.fn().mockResolvedValue(undefined);
-  const evaluateMock = vi.fn().mockResolvedValue(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/P5xGXwAAAABJRU5ErkJggg==',
+  const screenshotMock = vi.fn().mockResolvedValue(
+    Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/P5xGXwAAAABJRU5ErkJggg==', 'base64'),
   );
-  const closeMock = vi.fn().mockResolvedValue(undefined);
+  const setContentMock = vi.fn().mockResolvedValue(undefined);
+  const pageCloseMock = vi.fn().mockResolvedValue(undefined);
+  const contextCloseMock = vi.fn().mockResolvedValue(undefined);
   const newPageMock = vi.fn().mockResolvedValue({
-    goto: gotoMock,
-    evaluate: evaluateMock,
+    setContent: setContentMock,
+    screenshot: screenshotMock,
+    close: pageCloseMock,
   });
-  const launchMock = vi.fn().mockResolvedValue({
+  const newContextMock = vi.fn().mockResolvedValue({
     newPage: newPageMock,
-    close: closeMock,
+    close: contextCloseMock,
+  });
+  const browserCloseMock = vi.fn().mockResolvedValue(undefined);
+  const launchMock = vi.fn().mockResolvedValue({
+    newContext: newContextMock,
+    close: browserCloseMock,
   });
 
-  return { gotoMock, evaluateMock, closeMock, launchMock };
+  return { setContentMock, screenshotMock, browserCloseMock, launchMock, newContextMock };
 });
 
 vi.mock('playwright', () => ({
@@ -29,63 +35,37 @@ vi.mock('playwright', () => ({
   },
 }));
 
-const minimalDoc: ExcalidrawDocument = {
-  type: 'excalidraw',
-  version: 2,
-  source: 'test',
-  appState: { width: 1920, height: 1080, viewBackgroundColor: '#ffffff' },
-  elements: [
-    {
-      id: 'rect',
-      type: 'rectangle',
-      x: 100,
-      y: 100,
-      width: 400,
-      height: 200,
-      strokeColor: '#000000',
-      backgroundColor: '#ff0000',
-      strokeWidth: 2,
-      roughness: 1,
-    },
-    {
-      id: 'text',
-      type: 'text',
-      x: 120,
-      y: 140,
-      width: 360,
-      height: 80,
-      strokeColor: '#111111',
-      backgroundColor: 'transparent',
-      strokeWidth: 1,
-      roughness: 0,
-      text: 'テスト',
-      fontSize: 48,
-      fontFamily: 1,
-      textAlign: 'center',
-      verticalAlign: 'middle',
-    },
-  ],
-};
+const sampleHtml = '<html><body><h1>Test</h1></body></html>';
 
 describe('exporter', () => {
   test('PNGファイルを生成できる', async () => {
     const output = join(tmpdir(), `talkcapital-export-${Date.now()}.png`);
-    await exportToPng(minimalDoc, output, 1);
+    await exportToPng(sampleHtml, output, 1);
 
     const buf = await readFile(output);
     expect(buf.length).toBeGreaterThan(0);
     expect(buf.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
     expect(mocks.launchMock).toHaveBeenCalledWith({ headless: true });
-    expect(mocks.gotoMock).toHaveBeenCalledOnce();
-    expect(mocks.evaluateMock).toHaveBeenCalledOnce();
-    expect(mocks.closeMock).toHaveBeenCalledOnce();
+    expect(mocks.setContentMock).toHaveBeenCalledWith(sampleHtml, { waitUntil: 'networkidle' });
+    expect(mocks.screenshotMock).toHaveBeenCalledOnce();
+    expect(mocks.browserCloseMock).toHaveBeenCalledOnce();
   }, 30000);
 
   test('レンダリング失敗時もbrowserをcloseする', async () => {
-    mocks.evaluateMock.mockRejectedValueOnce(new Error('render failed'));
+    mocks.screenshotMock.mockRejectedValueOnce(new Error('render failed'));
     const output = join(tmpdir(), `talkcapital-export-fail-${Date.now()}.png`);
 
-    await expect(exportToPng(minimalDoc, output, 1)).rejects.toThrow('render failed');
-    expect(mocks.closeMock).toHaveBeenCalled();
+    await expect(exportToPng(sampleHtml, output, 1)).rejects.toThrow('render failed');
+    expect(mocks.browserCloseMock).toHaveBeenCalled();
+  });
+
+  test('newContext に deviceScaleFactor が渡される', async () => {
+    const output = join(tmpdir(), `talkcapital-export-scale-${Date.now()}.png`);
+    await exportToPng(sampleHtml, output, 2);
+
+    expect(mocks.newContextMock).toHaveBeenCalledWith({
+      viewport: { width: 3840, height: 2160 },
+      deviceScaleFactor: 2,
+    });
   });
 });

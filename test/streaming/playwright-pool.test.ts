@@ -3,98 +3,75 @@ import { PlaywrightPool } from '../../src/streaming/playwright-pool.js';
 
 function createMockBrowser() {
   const mockPage = {
-    goto: vi.fn().mockResolvedValue(undefined),
-    waitForFunction: vi.fn().mockResolvedValue(undefined),
-    evaluate: vi.fn().mockResolvedValue('base64pngdata'),
+    setContent: vi.fn().mockResolvedValue(undefined),
+    screenshot: vi.fn().mockResolvedValue(Buffer.from('pngdata')),
     close: vi.fn().mockResolvedValue(undefined),
   };
-  const mockBrowser = {
+  const mockContext = {
     newPage: vi.fn().mockResolvedValue(mockPage),
     close: vi.fn().mockResolvedValue(undefined),
   };
-  return { mockBrowser, mockPage };
+  const mockBrowser = {
+    newContext: vi.fn().mockResolvedValue(mockContext),
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+  return { mockBrowser, mockContext, mockPage };
 }
 
 describe('PlaywrightPool', () => {
-  it('init でブラウザとページを起動する', async () => {
+  it('init でブラウザを起動する', async () => {
+    const { mockBrowser } = createMockBrowser();
+    const launchBrowser = vi.fn().mockResolvedValue(mockBrowser);
+    const pool = new PlaywrightPool({ launchBrowser });
+
+    await pool.init();
+
+    expect(launchBrowser).toHaveBeenCalledOnce();
+    await pool.destroy();
+  });
+
+  it('renderHtmlToPng で base64 PNG を返す', async () => {
+    const { mockBrowser, mockPage } = createMockBrowser();
+    const pool = new PlaywrightPool({
+      launchBrowser: vi.fn().mockResolvedValue(mockBrowser),
+    });
+    await pool.init();
+
+    const html = '<html><body>test</body></html>';
+    const result = await pool.renderHtmlToPng(html);
+
+    expect(result).toBe(Buffer.from('pngdata').toString('base64'));
+    expect(mockPage.setContent).toHaveBeenCalledWith(html, { waitUntil: 'networkidle' });
+    expect(mockPage.screenshot).toHaveBeenCalledWith({ type: 'png', fullPage: false });
+
+    await pool.destroy();
+  });
+
+  it('init 前に renderHtmlToPng を呼ぶとエラー', async () => {
+    const pool = new PlaywrightPool();
+
+    await expect(pool.renderHtmlToPng('<html></html>')).rejects.toThrow('not initialized');
+  });
+
+  it('renderHtmlToPng に deviceScaleFactor が渡される', async () => {
     const { mockBrowser } = createMockBrowser();
     const pool = new PlaywrightPool({
       launchBrowser: vi.fn().mockResolvedValue(mockBrowser),
     });
-
     await pool.init();
 
-    expect(mockBrowser.newPage).toHaveBeenCalledOnce();
-    await pool.destroy();
-  });
+    await pool.renderHtmlToPng('<html></html>', 3);
 
-  it('exportToPng で base64 PNG を返す', async () => {
-    const { mockBrowser, mockPage } = createMockBrowser();
-    mockPage.evaluate.mockResolvedValue('iVBORw0KGgo=');
-
-    const pool = new PlaywrightPool({
-      launchBrowser: vi.fn().mockResolvedValue(mockBrowser),
+    expect(mockBrowser.newContext).toHaveBeenCalledWith({
+      viewport: { width: 3840, height: 2160 },
+      deviceScaleFactor: 3,
     });
-    await pool.init();
-
-    const doc = {
-      type: 'excalidraw' as const,
-      version: 2 as const,
-      source: 'test',
-      elements: [],
-      appState: { viewBackgroundColor: '#fff', width: 1920, height: 1080 },
-    };
-
-    const result = await pool.exportToPng(doc);
-    expect(result).toBe('iVBORw0KGgo=');
-    expect(mockPage.evaluate).toHaveBeenCalledOnce();
 
     await pool.destroy();
   });
 
-  it('init 前に exportToPng を呼ぶとエラー', async () => {
-    const pool = new PlaywrightPool();
-    const doc = {
-      type: 'excalidraw' as const,
-      version: 2 as const,
-      source: 'test',
-      elements: [],
-      appState: { viewBackgroundColor: '#fff', width: 1920, height: 1080 },
-    };
-
-    await expect(pool.exportToPng(doc)).rejects.toThrow('not initialized');
-  });
-
-  it('50回レンダリング後にページが再作成される', async () => {
-    const { mockBrowser, mockPage } = createMockBrowser();
-    const pool = new PlaywrightPool({
-      launchBrowser: vi.fn().mockResolvedValue(mockBrowser),
-    });
-    await pool.init();
-
-    const doc = {
-      type: 'excalidraw' as const,
-      version: 2 as const,
-      source: 'test',
-      elements: [],
-      appState: { viewBackgroundColor: '#fff', width: 1920, height: 1080 },
-    };
-
-    // 50回レンダリング
-    for (let i = 0; i < 50; i++) {
-      await pool.exportToPng(doc);
-    }
-
-    // 初期の1回 + 50回目でリフレッシュの1回 = 2回
-    expect(mockBrowser.newPage).toHaveBeenCalledTimes(2);
-    // ページのclose: リフレッシュ時の1回
-    expect(mockPage.close).toHaveBeenCalledTimes(1);
-
-    await pool.destroy();
-  });
-
-  it('destroy でブラウザとページを閉じる', async () => {
-    const { mockBrowser, mockPage } = createMockBrowser();
+  it('destroy でブラウザを閉じる', async () => {
+    const { mockBrowser } = createMockBrowser();
     const pool = new PlaywrightPool({
       launchBrowser: vi.fn().mockResolvedValue(mockBrowser),
     });
@@ -102,7 +79,6 @@ describe('PlaywrightPool', () => {
 
     await pool.destroy();
 
-    expect(mockPage.close).toHaveBeenCalled();
     expect(mockBrowser.close).toHaveBeenCalled();
   });
 });

@@ -8,7 +8,7 @@ const mockConfig: Config = {
   llm: { provider: 'bedrock' as const },
   bedrock: { modelId: 'anthropic.claude-sonnet-4-20250514-v1:0', region: 'us-east-1' },
   output: { scale: 2 },
-  illustration: { enabled: false, modelId: 'amazon.nova-canvas-v1:0', region: 'us-east-1', iconSize: 100 },
+  illustration: { enabled: false, modelId: 'amazon.nova-canvas-v1:0', region: 'us-east-1', iconSize: 512 },
 };
 
 function createMockTranscribeStream() {
@@ -43,7 +43,7 @@ function createMockTranscribeStream() {
 function createMockPool() {
   return {
     init: vi.fn().mockResolvedValue(undefined),
-    exportToPng: vi.fn().mockResolvedValue('base64png'),
+    renderHtmlToPng: vi.fn().mockResolvedValue('base64png'),
     destroy: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
@@ -156,7 +156,7 @@ describe('StreamingSession', () => {
     await closePromise;
 
     expect(pngs).toHaveLength(1);
-    expect(pool.exportToPng).toHaveBeenCalled();
+    expect(pool.renderHtmlToPng).toHaveBeenCalled();
   });
 
   it('interimToStructured でプレースホルダ補完する', () => {

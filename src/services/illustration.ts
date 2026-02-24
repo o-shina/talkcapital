@@ -1,71 +1,54 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { Config } from '../config/index.js';
 import type { StructuredContent } from '../types/structured-content.js';
-import type { BinaryFileData, BinaryFiles } from '../types/excalidraw.js';
-import { nanoid } from 'nanoid';
 
 export interface IllustrationDependencies {
   client?: Pick<BedrockRuntimeClient, 'send'>;
 }
 
 /**
- * 各ブロックの見出しに基づいて手描き風アイコン画像を生成する。
- * 返り値はブロックインデックス → BinaryFileData のマップ。
+ * 各ブロックの見出しに基づいて手描き風イラスト画像を生成する。
+ * 返り値はブロックインデックス → base64 DataURL のマップ。
  */
 export async function generateBlockIcons(
   content: StructuredContent,
   config: Config,
   deps: IllustrationDependencies = {},
-): Promise<BinaryFiles> {
+): Promise<Map<number, string>> {
   if (!config.illustration.enabled) {
-    return {};
+    return new Map();
   }
 
   const client = deps.client ?? new BedrockRuntimeClient({ region: config.illustration.region });
-  const size = config.illustration.iconSize;
+  const size = Math.max(512, config.illustration.iconSize);
 
   const tasks = content.blocks.map(async (block, index) => {
-    const fileId = `icon-block-${index}-${nanoid(8)}`;
     const prompt = buildIconPrompt(block.heading);
 
     try {
       const imageBase64 = await invokeImageModel(client, config.illustration.modelId, prompt, size);
-      const data: BinaryFileData = {
-        mimeType: 'image/png',
-        id: fileId,
-        dataURL: `data:image/png;base64,${imageBase64}`,
-        created: Date.now(),
-      };
-      return { index, fileId, data };
+      return { index, dataURL: `data:image/png;base64,${imageBase64}` };
     } catch (error) {
-      // アイコン生成失敗は致命的ではない。ログして続行
       process.stderr.write(`[illustration] block ${index} のアイコン生成に失敗: ${String(error)}\n`);
       return null;
     }
   });
 
   const results = await Promise.all(tasks);
-  const files: BinaryFiles = {};
+  const map = new Map<number, string>();
   for (const result of results) {
     if (result) {
-      files[result.fileId] = result.data;
+      map.set(result.index, result.dataURL);
     }
   }
-  return files;
-}
-
-/**
- * 生成済み BinaryFiles からブロックインデックスに対応する fileId を取得する。
- * fileId は "icon-block-{index}-" で始まる。
- */
-export function getFileIdForBlock(files: BinaryFiles, blockIndex: number): string | undefined {
-  const prefix = `icon-block-${blockIndex}-`;
-  return Object.keys(files).find((key) => key.startsWith(prefix));
+  return map;
 }
 
 function buildIconPrompt(heading: string): string {
-  return `Simple hand-drawn doodle icon representing "${heading}". Black line art on white background. Minimalist sketch style. Single object, no text, no words, no letters.`;
+  return `Cute hand-drawn watercolor doodle illustration of "${heading}". Soft pastel colors, simple shapes, white background. Children's book illustration style. No text, no words, no letters, no characters.`;
 }
+
+const NEGATIVE_TEXT = 'text, words, letters, alphabet, numbers, kanji, hiragana, katakana, writing, caption, label, watermark, signature';
 
 async function invokeImageModel(
   client: Pick<BedrockRuntimeClient, 'send'>,
@@ -73,12 +56,10 @@ async function invokeImageModel(
   prompt: string,
   size: number,
 ): Promise<string> {
-  // Amazon Nova Canvas のリクエスト形式
   if (modelId.startsWith('amazon.nova-canvas')) {
     return invokeNovaCanvas(client, modelId, prompt, size);
   }
 
-  // Stability AI SDXL のリクエスト形式
   if (modelId.startsWith('stability.')) {
     return invokeStabilityModel(client, modelId, prompt, size);
   }
@@ -100,10 +81,11 @@ async function invokeNovaCanvas(
       taskType: 'TEXT_IMAGE',
       textToImageParams: {
         text: prompt,
+        negativeText: NEGATIVE_TEXT,
       },
       imageGenerationConfig: {
-        width: Math.max(320, size),
-        height: Math.max(320, size),
+        width: size,
+        height: size,
         numberOfImages: 1,
         quality: 'standard',
       },
@@ -134,12 +116,12 @@ async function invokeStabilityModel(
     body: JSON.stringify({
       text_prompts: [
         { text: prompt, weight: 1 },
-        { text: 'text, words, letters, blurry, low quality', weight: -1 },
+        { text: NEGATIVE_TEXT, weight: -1 },
       ],
       cfg_scale: 7,
       steps: 30,
-      width: Math.max(512, size),
-      height: Math.max(512, size),
+      width: size,
+      height: size,
     }),
   });
 

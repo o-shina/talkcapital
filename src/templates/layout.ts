@@ -6,26 +6,24 @@ export const CANVAS = {
 // 全体レイアウト:
 // 上部: タイトル + メインメッセージ (横並び)
 // 中央: 4ブロック (2x2グリッド)
-// 右側: 吹き出し (縦並び)
-// 下部: アクションエリア
+// 右側: 吹き出し (縦並び) + アクション
 
-const PADDING = 40;
-const BLOCK_GAP = 30;
+const PADDING = 50;
+const GAP = 40;
 
 // タイトル行
-const TITLE_H = 100;
+const TITLE_H = 120;
 
-// ブロックエリア (左側 2/3)
+// ブロックエリア (左側 ~63%)
 const BLOCKS_AREA_W = 2400;
-const BLOCK_W = (BLOCKS_AREA_W - BLOCK_GAP) / 2; // ~1185
-const BLOCK_H = 560;
+const BLOCK_W = (BLOCKS_AREA_W - GAP) / 2; // ~1180
+const BLOCK_H = 600;
 
-// 吹き出しエリア (右側 1/3)
-const BUBBLE_AREA_X = PADDING + BLOCKS_AREA_W + 60;
-const BUBBLE_W = 3840 - BUBBLE_AREA_X - PADDING; // ~1300
-const BUBBLE_H = 180;
-const BUBBLE_GAP = 30;
-
+// 吹き出しエリア (右側)
+const BUBBLE_AREA_X = PADDING + BLOCKS_AREA_W + 80;
+const BUBBLE_W = 3840 - BUBBLE_AREA_X - PADDING;
+const BUBBLE_H = 200;
+const BUBBLE_GAP = 40;
 
 export const LAYOUT = {
   title: {
@@ -33,13 +31,13 @@ export const LAYOUT = {
     y: PADDING,
     width: 1200,
     height: TITLE_H,
-    fontSize: 48,
+    fontSize: 52,
     textAlign: 'center' as const,
   },
   mainMessage: {
-    x: PADDING + 1200 + BLOCK_GAP,
+    x: PADDING + 1200 + GAP,
     y: PADDING,
-    width: 3840 - PADDING * 2 - 1200 - BLOCK_GAP,
+    width: 3840 - PADDING * 2 - 1200 - GAP,
     height: TITLE_H,
     fontSize: 36,
     textAlign: 'center' as const,
@@ -47,53 +45,51 @@ export const LAYOUT = {
   blocks: [
     {
       x: PADDING,
-      y: PADDING + TITLE_H + BLOCK_GAP,
+      y: PADDING + TITLE_H + GAP,
       width: BLOCK_W,
       height: BLOCK_H,
     },
     {
-      x: PADDING + BLOCK_W + BLOCK_GAP,
-      y: PADDING + TITLE_H + BLOCK_GAP,
+      x: PADDING + BLOCK_W + GAP,
+      y: PADDING + TITLE_H + GAP,
       width: BLOCK_W,
       height: BLOCK_H,
     },
     {
       x: PADDING,
-      y: PADDING + TITLE_H + BLOCK_GAP + BLOCK_H + BLOCK_GAP,
+      y: PADDING + TITLE_H + GAP + BLOCK_H + GAP,
       width: BLOCK_W,
       height: BLOCK_H,
     },
     {
-      x: PADDING + BLOCK_W + BLOCK_GAP,
-      y: PADDING + TITLE_H + BLOCK_GAP + BLOCK_H + BLOCK_GAP,
+      x: PADDING + BLOCK_W + GAP,
+      y: PADDING + TITLE_H + GAP + BLOCK_H + GAP,
       width: BLOCK_W,
       height: BLOCK_H,
     },
   ],
-  // 見出しはブロック上部に配置、箇条書きはその下
-  blockHeading: {
-    height: 60,
-    fontSize: 32,
-    topInset: 16,
-  },
-  blockBullet: {
-    fontSize: 26,
-    lineHeight: 70,
-    topOffset: 80,   // 見出しの下からのオフセット
-    leftPadding: 30,
-    rightPadding: 30,
-  },
+  /** ブロック内のフォントサイズ */
+  blockHeadingFontSize: 40,
+  blockBulletFontSize: 26,
+  /** ブロック内部のレイアウト定数 */
+  blockHeadingHeight: 70,
+  blockHeadingTopInset: 25,
+  blockBulletTopOffset: 100,
+  blockBulletLineHeight: 80,
+  blockBulletLeftPadding: 70,
+  blockBulletRightPadding: 36,
   speechBubbles: [
-    { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + BLOCK_GAP, width: BUBBLE_W, height: BUBBLE_H },
-    { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + BLOCK_GAP + (BUBBLE_H + BUBBLE_GAP), width: BUBBLE_W, height: BUBBLE_H },
-    { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + BLOCK_GAP + (BUBBLE_H + BUBBLE_GAP) * 2, width: BUBBLE_W, height: BUBBLE_H },
-    { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + BLOCK_GAP + (BUBBLE_H + BUBBLE_GAP) * 3, width: BUBBLE_W, height: BUBBLE_H },
+    { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + GAP, width: BUBBLE_W, height: BUBBLE_H },
+    { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + GAP + (BUBBLE_H + BUBBLE_GAP), width: BUBBLE_W, height: BUBBLE_H },
+    { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + GAP + (BUBBLE_H + BUBBLE_GAP) * 2, width: BUBBLE_W, height: BUBBLE_H },
+    { x: BUBBLE_AREA_X, y: PADDING + TITLE_H + GAP + (BUBBLE_H + BUBBLE_GAP) * 3, width: BUBBLE_W, height: BUBBLE_H },
   ],
+  speechBubbleFontSize: 26,
   actions: {
     x: BUBBLE_AREA_X,
-    y: PADDING + TITLE_H + BLOCK_GAP + (BUBBLE_H + BUBBLE_GAP) * 4 + 20,
+    y: PADDING + TITLE_H + GAP + (BUBBLE_H + BUBBLE_GAP) * 4 + 30,
     width: BUBBLE_W,
-    height: 450,
+    height: 500,
     headerFontSize: 36,
     itemFontSize: 28,
   },

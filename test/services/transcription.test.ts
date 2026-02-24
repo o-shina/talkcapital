@@ -10,6 +10,7 @@ const config: Config = {
   llm: { provider: 'bedrock' },
   bedrock: { region: 'us-east-1', modelId: 'model' },
   output: { scale: 2 },
+  illustration: { enabled: false, modelId: 'amazon.nova-canvas-v1:0', region: 'us-east-1', iconSize: 512 },
 };
 
 describe('transcription service', () => {

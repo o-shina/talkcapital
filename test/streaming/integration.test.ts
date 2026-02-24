@@ -3,18 +3,12 @@ import type { Config } from '../../src/config/index.js';
 import type { InterimStructuredContent } from '../../src/types/structured-content.js';
 import { StreamingSession } from '../../src/streaming/session.js';
 
-/**
- * 統合テスト: StreamingSession のフルフロー
- * TranscribeStream / PlaywrightPool / Bedrock をモックし、
- * start → feedAudio → transcript蓄積 → interim構造化+PNG → end → 最終PNG
- * の一連のフローを検証する。
- */
-
 const mockConfig: Config = {
   aws: { region: 'ap-northeast-1', s3Bucket: 'test', s3KeyPrefix: 'test' },
   llm: { provider: 'bedrock' as const },
   bedrock: { modelId: 'anthropic.claude-sonnet-4-20250514-v1:0', region: 'us-east-1' },
   output: { scale: 2 },
+  illustration: { enabled: false, modelId: 'amazon.nova-canvas-v1:0', region: 'us-east-1', iconSize: 512 },
 };
 
 function createMockTranscribeStream() {
@@ -49,7 +43,7 @@ function createMockTranscribeStream() {
 function createMockPool() {
   return {
     init: vi.fn().mockResolvedValue(undefined),
-    exportToPng: vi.fn().mockResolvedValue('base64pngdata'),
+    renderHtmlToPng: vi.fn().mockResolvedValue('base64pngdata'),
     destroy: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
@@ -157,8 +151,8 @@ describe('統合テスト: StreamingSession フルフロー', () => {
     // Bedrock が呼ばれていること（最終版の structureTranscript 経由）
     expect(bedrockClient.send).toHaveBeenCalled();
 
-    // PlaywrightPool.exportToPng が呼ばれていること
-    expect(pool.exportToPng).toHaveBeenCalled();
+    // PlaywrightPool.renderHtmlToPng が呼ばれていること
+    expect(pool.renderHtmlToPng).toHaveBeenCalled();
   });
 
   it('テキスト蓄積なしで end() した場合、PNGは生成されない', async () => {
@@ -183,7 +177,7 @@ describe('統合テスト: StreamingSession フルフロー', () => {
 
     // テキストなしなのでPNG生成されない
     expect(graphicFinals).toHaveLength(0);
-    expect(pool.exportToPng).not.toHaveBeenCalled();
+    expect(pool.renderHtmlToPng).not.toHaveBeenCalled();
   });
 
   it('interimToStructured が blocks/speechBubbles/actions を補完する', () => {

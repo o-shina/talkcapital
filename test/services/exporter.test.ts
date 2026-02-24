@@ -11,8 +11,10 @@ const mocks = vi.hoisted(() => {
   const setContentMock = vi.fn().mockResolvedValue(undefined);
   const pageCloseMock = vi.fn().mockResolvedValue(undefined);
   const contextCloseMock = vi.fn().mockResolvedValue(undefined);
+  const waitForFunctionMock = vi.fn().mockResolvedValue(undefined);
   const newPageMock = vi.fn().mockResolvedValue({
     setContent: setContentMock,
+    waitForFunction: waitForFunctionMock,
     screenshot: screenshotMock,
     close: pageCloseMock,
   });

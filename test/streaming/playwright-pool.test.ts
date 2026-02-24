@@ -4,6 +4,7 @@ import { PlaywrightPool } from '../../src/streaming/playwright-pool.js';
 function createMockBrowser() {
   const mockPage = {
     setContent: vi.fn().mockResolvedValue(undefined),
+    waitForFunction: vi.fn().mockResolvedValue(undefined),
     screenshot: vi.fn().mockResolvedValue(Buffer.from('pngdata')),
     close: vi.fn().mockResolvedValue(undefined),
   };

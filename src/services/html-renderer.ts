@@ -15,13 +15,86 @@ export function renderToHtml(
   const illustrations = options?.illustrations;
   const resolvedBlocks = resolveBlockLayouts(content, LAYOUT.blocks);
 
-  // Seed for speech bubble jitter
   const hashStr = content.title + content.mainMessage;
   let hashVal = 0;
   for (let i = 0; i < hashStr.length; i++) {
     hashVal = ((hashVal << 5) - hashVal + hashStr.charCodeAt(i)) | 0;
   }
   const rand = seededRandom(Math.abs(hashVal) + 42);
+
+  // Build rough.js draw commands as JSON for client-side execution
+  const roughCommands: string[] = [];
+
+  // Title box
+  roughCommands.push(`rc.rectangle(${LAYOUT.title.x}, ${LAYOUT.title.y}, ${LAYOUT.title.width}, ${LAYOUT.title.height}, {fill:'${COLORS.title.fill}', stroke:'${COLORS.title.stroke}', fillStyle:'solid', roughness:2.5, strokeWidth:3, seed:${Math.floor(rand() * 100000)}})`);
+
+  // Main message box
+  roughCommands.push(`rc.rectangle(${LAYOUT.mainMessage.x}, ${LAYOUT.mainMessage.y}, ${LAYOUT.mainMessage.width}, ${LAYOUT.mainMessage.height}, {fill:'${COLORS.mainMessage.fill}', stroke:'${COLORS.mainMessage.stroke}', fillStyle:'solid', roughness:2, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+
+  // Blocks
+  for (let i = 0; i < resolvedBlocks.length; i++) {
+    const layout = resolvedBlocks[i];
+    const color = COLORS.blocks[i];
+    roughCommands.push(`rc.rectangle(${layout.x}, ${layout.y}, ${layout.width}, ${layout.height}, {fill:'${color.fill}', stroke:'${color.stroke}', fillStyle:'solid', roughness:2.5, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+
+    // Block heading underline (hand-drawn)
+    const ulY = layout.y + 80;
+    roughCommands.push(`rc.line(${layout.x + 20}, ${ulY}, ${layout.x + layout.width - 20}, ${ulY}, {stroke:'${color.stroke}', roughness:3, strokeWidth:3, seed:${Math.floor(rand() * 100000)}})`);
+
+    // Bullet markers
+    const block = content.blocks[i];
+    if (block) {
+      const illustOffset = illustrations?.has(i) ? 230 : 0;
+      block.bullets.forEach((_, bIdx) => {
+        const bx = layout.x + 30 + illustOffset;
+        const by = layout.y + 110 + bIdx * 80;
+        roughCommands.push(`rc.circle(${bx + 6}, ${by + 14}, 14, {fill:'${color.stroke}', stroke:'${color.stroke}', fillStyle:'solid', roughness:1.5, strokeWidth:1, seed:${Math.floor(rand() * 100000)}})`);
+      });
+    }
+  }
+
+  // Speech bubbles
+  for (let i = 0; i < content.speechBubbles.length; i++) {
+    const layout = LAYOUT.speechBubbles[i];
+    if (!layout) break;
+    const bubble = content.speechBubbles[i];
+    const bubbleStroke = bubble.emphasis
+      ? COLORS.emphasis[bubble.emphasis]
+      : COLORS.speechBubble.stroke;
+    roughCommands.push(`rc.ellipse(${layout.x + layout.width / 2}, ${layout.y + layout.height / 2}, ${layout.width}, ${layout.height}, {fill:'${COLORS.speechBubble.fill}', stroke:'${bubbleStroke}', fillStyle:'solid', roughness:2, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+
+    // Speech tail
+    const tx = layout.x + layout.width * 0.35;
+    const ty = layout.y + layout.height - 10;
+    roughCommands.push(`rc.line(${tx}, ${ty}, ${tx - 20}, ${ty + 40}, {stroke:'${bubbleStroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
+    roughCommands.push(`rc.line(${tx + 30}, ${ty}, ${tx - 20}, ${ty + 40}, {stroke:'${bubbleStroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
+  }
+
+  // Actions area
+  roughCommands.push(`rc.rectangle(${LAYOUT.actions.x}, ${LAYOUT.actions.y}, ${LAYOUT.actions.width}, ${LAYOUT.actions.height}, {fill:'${COLORS.actions.fill}', stroke:'${COLORS.actions.stroke}', fillStyle:'solid', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
+
+  // Actions underline
+  roughCommands.push(`rc.line(${LAYOUT.actions.x + 20}, ${LAYOUT.actions.y + 60}, ${LAYOUT.actions.x + LAYOUT.actions.width - 20}, ${LAYOUT.actions.y + 60}, {stroke:'${COLORS.actions.stroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
+
+  // Action checkboxes
+  content.actions.forEach((_, idx) => {
+    const ay = LAYOUT.actions.y + 90 + idx * 100;
+    roughCommands.push(`rc.rectangle(${LAYOUT.actions.x + 30}, ${ay}, 34, 34, {stroke:'${COLORS.actions.stroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
+  });
+
+  // Connector arrows (hand-drawn)
+  const titleEndX = LAYOUT.title.x + LAYOUT.title.width + 10;
+  const titleMidY = LAYOUT.title.y + LAYOUT.title.height / 2;
+  const msgStartX = LAYOUT.mainMessage.x - 10;
+  const msgMidY = LAYOUT.mainMessage.y + LAYOUT.mainMessage.height / 2;
+  roughCommands.push(`rc.line(${titleEndX}, ${titleMidY}, ${msgStartX}, ${msgMidY}, {stroke:'${COLORS.connector}', roughness:1.5, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+  // Arrowhead
+  roughCommands.push(`rc.line(${msgStartX}, ${msgMidY}, ${msgStartX - 20}, ${msgMidY - 15}, {stroke:'${COLORS.connector}', roughness:1, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+  roughCommands.push(`rc.line(${msgStartX}, ${msgMidY}, ${msgStartX - 20}, ${msgMidY + 15}, {stroke:'${COLORS.connector}', roughness:1, strokeWidth:2.5, seed:${Math.floor(rand() * 100000)}})`);
+
+  // Vertical divider line
+  const divX = LAYOUT.blocks[0].x + LAYOUT.blocks[0].width * 2 + 120;
+  roughCommands.push(`rc.line(${divX}, ${LAYOUT.title.y + LAYOUT.title.height + 20}, ${divX}, ${CANVAS.height - 50}, {stroke:'${COLORS.decorationLight}', roughness:2, strokeWidth:1.5, seed:${Math.floor(rand() * 100000)}, strokeLineDash:[20,15]})`);
 
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -30,6 +103,7 @@ export function renderToHtml(
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/roughjs@4.6.6/bundled/rough.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -41,243 +115,160 @@ body {
   position: relative;
   overflow: hidden;
 }
-.title {
+#rough-canvas {
+  position: absolute;
+  left: 0; top: 0;
+  width: ${CANVAS.width}px;
+  height: ${CANVAS.height}px;
+}
+.text-overlay {
+  position: absolute;
+  pointer-events: none;
+}
+.title-text {
   position: absolute;
   left: ${LAYOUT.title.x}px;
   top: ${LAYOUT.title.y}px;
   width: ${LAYOUT.title.width}px;
   height: ${LAYOUT.title.height}px;
-  background: ${COLORS.title.fill};
-  border: 2.5px solid ${COLORS.title.stroke};
-  border-radius: 18px 6px 18px 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 38px;
+  font-size: 48px;
   font-weight: 600;
-  padding: 0 16px;
   text-align: center;
-  line-height: 1.2;
+  line-height: 1.15;
+  padding: 0 20px;
 }
-.main-message {
+.main-message-text {
   position: absolute;
   left: ${LAYOUT.mainMessage.x}px;
   top: ${LAYOUT.mainMessage.y}px;
   width: ${LAYOUT.mainMessage.width}px;
   height: ${LAYOUT.mainMessage.height}px;
-  background: ${COLORS.mainMessage.fill};
-  border: 2px solid ${COLORS.mainMessage.stroke};
-  border-radius: 40px 40px 40px 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  padding: 0 24px;
+  font-size: 36px;
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.2;
+  padding: 0 30px;
 }
-.block {
+.block-text {
   position: absolute;
-  border-radius: 16px 4px 16px 4px;
-  padding: 16px 20px;
-  border-width: 2px;
-  border-style: solid;
+  padding: 20px 24px;
   overflow: hidden;
 }
 .block-heading {
-  font-size: ${LAYOUT.blockHeadingFontSize}px;
+  font-size: 40px;
   font-weight: 600;
-  margin-bottom: 4px;
-  line-height: 1.2;
-}
-.block-underline {
-  height: 3px;
-  margin: 4px 0 12px 0;
-  border-radius: 2px;
+  margin-bottom: 10px;
+  line-height: 1.15;
 }
 .block-illustration {
   float: left;
-  margin: 0 14px 8px 0;
-  border-radius: 12px;
-  width: 120px;
-  height: 120px;
+  margin: 8px 18px 8px 0;
+  border-radius: 16px;
+  width: 200px;
+  height: 200px;
   object-fit: cover;
 }
-.block-bullets {
+.block-bullet-list {
   list-style: none;
   padding: 0;
+  margin-top: 16px;
 }
-.block-bullets li {
-  font-size: ${LAYOUT.blockBulletFontSize}px;
-  line-height: 1.5;
-  padding-left: 20px;
-  position: relative;
-  margin-bottom: 4px;
+.block-bullet-list li {
+  font-size: 28px;
+  line-height: 1.6;
+  padding-left: 28px;
+  margin-bottom: 6px;
 }
-.block-bullets li::before {
-  content: '';
+.bubble-text {
   position: absolute;
-  left: 0;
-  top: 10px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-.speech-area {
-  position: absolute;
-}
-.speech-bubble {
-  position: absolute;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: ${LAYOUT.speechBubbleFontSize}px;
+  font-size: 28px;
+  font-style: italic;
   line-height: 1.3;
-  padding: 20px 24px;
-  background: ${COLORS.speechBubble.fill};
-  border-width: 2px;
-  border-style: solid;
+  padding: 30px 40px;
 }
-.speech-tail {
-  position: absolute;
-}
-.actions-area {
+.actions-text {
   position: absolute;
   left: ${LAYOUT.actions.x}px;
   top: ${LAYOUT.actions.y}px;
   width: ${LAYOUT.actions.width}px;
   height: ${LAYOUT.actions.height}px;
-  background: ${COLORS.actions.fill};
-  border: 2px solid ${COLORS.actions.stroke};
-  border-radius: 16px 4px 16px 4px;
-  padding: 20px 28px;
+  padding: 16px 30px;
 }
 .actions-header {
-  font-size: ${LAYOUT.actions.headerFontSize}px;
+  font-size: 38px;
   font-weight: 600;
-  margin-bottom: 8px;
-}
-.actions-underline {
-  height: 2px;
-  background: ${COLORS.actions.stroke};
-  border-radius: 1px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  line-height: 1.2;
 }
 .action-item {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 18px;
-  font-size: ${LAYOUT.actions.itemFontSize}px;
+  gap: 18px;
+  margin-bottom: 22px;
+  font-size: 30px;
   line-height: 1.4;
-}
-.action-checkbox {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border: 2px solid ${COLORS.actions.stroke};
-  border-radius: 6px;
-  margin-top: 2px;
-}
-.connectors {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: ${CANVAS.width}px;
-  height: ${CANVAS.height}px;
-  pointer-events: none;
+  padding-left: 50px;
 }
 </style>
 </head>
 <body>
 
-<!-- タイトル -->
-<div class="title">${escapeHtml(content.title)}</div>
+<!-- rough.js draws all shapes here -->
+<svg id="rough-canvas" viewBox="0 0 ${CANVAS.width} ${CANVAS.height}"></svg>
 
-<!-- メインメッセージ -->
-<div class="main-message">${escapeHtml(content.mainMessage)}</div>
+<!-- Text overlays (crisp text on top of sketchy shapes) -->
+<div class="title-text">${escapeHtml(content.title)}</div>
+<div class="main-message-text">${escapeHtml(content.mainMessage)}</div>
 
-<!-- ブロック ×${content.blocks.length} -->
 ${content.blocks.map((block, i) => {
   const layout = resolvedBlocks[i];
   const color = COLORS.blocks[i];
-  const angleDeg = (layout.angle * 180) / Math.PI;
   const illust = illustrations?.get(i);
-  return `<div class="block" style="
-    left:${layout.x}px; top:${layout.y}px;
-    width:${layout.width}px; height:${layout.height}px;
-    background:${color.fill}; border-color:${color.stroke};
-    transform: rotate(${angleDeg.toFixed(2)}deg);
-  ">
-    <div class="block-heading" style="color:${color.stroke}">${escapeHtml(block.heading)}</div>
-    <div class="block-underline" style="background:${color.stroke}"></div>
-    ${illust ? `<img class="block-illustration" src="${illust}" alt="">` : ''}
-    <ul class="block-bullets">
-      ${block.bullets.map(b => `<li style=""><span style="position:absolute;left:0;top:10px;width:8px;height:8px;border-radius:50%;background:${color.stroke};display:block;"></span>${escapeHtml(b.text)}</li>`).join('\n      ')}
-    </ul>
-  </div>`;
+  const illustOffset = illust ? 230 : 0;
+  return `<div class="block-text" style="left:${layout.x}px;top:${layout.y}px;width:${layout.width}px;height:${layout.height}px;">
+  <div class="block-heading" style="color:${color.stroke}">${escapeHtml(block.heading)}</div>
+  ${illust ? `<img class="block-illustration" src="${illust}" alt="">` : ''}
+  <ul class="block-bullet-list">
+    ${block.bullets.map(b => `<li style="padding-left:${28 + illustOffset}px;">${escapeHtml(b.text)}</li>`).join('\n    ')}
+  </ul>
+</div>`;
 }).join('\n')}
 
-<!-- 吹き出し ×${content.speechBubbles.length} -->
 ${content.speechBubbles.map((bubble, i) => {
   const layout = LAYOUT.speechBubbles[i];
   if (!layout) return '';
-  const bubbleStroke = bubble.emphasis
-    ? COLORS.emphasis[bubble.emphasis]
-    : COLORS.speechBubble.stroke;
-  const jitterAngle = ((rand() - 0.5) * 4).toFixed(1);
-  const tailX = layout.x + layout.width * 0.3;
-  const tailY = layout.y + layout.height;
-  return `<div class="speech-bubble" style="
-    left:${layout.x}px; top:${layout.y}px;
-    width:${layout.width}px; height:${layout.height}px;
-    border-color:${bubbleStroke};
-    transform: rotate(${jitterAngle}deg);
-  ">&ldquo;${escapeHtml(bubble.quote)}&rdquo;</div>
-  <svg class="speech-tail" style="left:${tailX}px;top:${tailY - 4}px;position:absolute;" width="30" height="24" viewBox="0 0 30 24">
-    <path d="M0,0 L8,22 L24,16 Z" fill="${COLORS.speechBubble.fill}" stroke="${bubbleStroke}" stroke-width="2" stroke-linejoin="round"/>
-  </svg>`;
+  return `<div class="bubble-text" style="left:${layout.x}px;top:${layout.y}px;width:${layout.width}px;height:${layout.height}px;">
+  &ldquo;${escapeHtml(bubble.quote)}&rdquo;
+</div>`;
 }).join('\n')}
 
-<!-- アクションエリア -->
-<div class="actions-area">
+<div class="actions-text">
   <div class="actions-header">今日からできるアクション</div>
-  <div class="actions-underline"></div>
-  ${content.actions.map(action => `<div class="action-item">
-    <div class="action-checkbox"></div>
-    <div>${escapeHtml(action.text)}</div>
-  </div>`).join('\n  ')}
+  ${content.actions.map(action => `<div class="action-item">${escapeHtml(action.text)}</div>`).join('\n  ')}
 </div>
 
-<!-- SVGコネクタ・装飾 -->
-<svg class="connectors" viewBox="0 0 ${CANVAS.width} ${CANVAS.height}" xmlns="http://www.w3.org/2000/svg">
-  <!-- タイトル → メインメッセージ の矢印 -->
-  <path d="M${LAYOUT.title.x + LAYOUT.title.width + 8},${LAYOUT.title.y + LAYOUT.title.height / 2}
-           C${LAYOUT.title.x + LAYOUT.title.width + 30},${LAYOUT.title.y + LAYOUT.title.height / 2 - 10}
-            ${LAYOUT.mainMessage.x - 30},${LAYOUT.mainMessage.y + LAYOUT.mainMessage.height / 2 + 10}
-            ${LAYOUT.mainMessage.x - 8},${LAYOUT.mainMessage.y + LAYOUT.mainMessage.height / 2}"
-        stroke="${COLORS.connector}" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
-
-  <!-- メインメッセージ → アクション の点線矢印 -->
-  <path d="M${LAYOUT.actions.x + LAYOUT.actions.width / 2},${LAYOUT.mainMessage.y + LAYOUT.mainMessage.height + 8}
-           C${LAYOUT.actions.x + LAYOUT.actions.width / 2},${LAYOUT.mainMessage.y + LAYOUT.mainMessage.height + 50}
-            ${LAYOUT.actions.x + LAYOUT.actions.width / 2},${LAYOUT.actions.y - 50}
-            ${LAYOUT.actions.x + LAYOUT.actions.width / 2},${LAYOUT.actions.y - 8}"
-        stroke="${COLORS.connector}" stroke-width="1.5" fill="none" stroke-dasharray="8,6" marker-end="url(#arrowhead)"/>
-
-  <!-- ブロックエリアとサイドエリアの区切り線（波線） -->
-  <path d="M920,130 ${generateWavyLine(920, 130, 920, 830, 8, 12)}"
-        stroke="${COLORS.decorationLight}" stroke-width="1" fill="none"/>
-
-  <!-- 矢印マーカー定義 -->
-  <defs>
-    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="${COLORS.connector}"/>
-    </marker>
-  </defs>
-</svg>
+<script>
+document.fonts.ready.then(function() {
+  var svg = document.getElementById('rough-canvas');
+  var rc = rough.svg(svg);
+  var commands = [
+    ${roughCommands.map(cmd => `function(rc){return ${cmd}}`).join(',\n    ')}
+  ];
+  commands.forEach(function(fn) {
+    svg.appendChild(fn(rc));
+  });
+  window.__roughDone = true;
+});
+</script>
 
 </body>
 </html>`;
@@ -289,21 +280,4 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-function generateWavyLine(
-  _x1: number, y1: number,
-  _x2: number, y2: number,
-  amplitude: number,
-  wavelength: number,
-): string {
-  const segments: string[] = [];
-  const steps = Math.ceil(Math.abs(y2 - y1) / wavelength);
-  for (let i = 0; i < steps; i++) {
-    const cy = y1 + (i + 0.5) * wavelength;
-    const ey = y1 + (i + 1) * wavelength;
-    const dir = i % 2 === 0 ? 1 : -1;
-    segments.push(`Q${_x1 + dir * amplitude},${cy} ${_x1},${Math.min(ey, y2)}`);
-  }
-  return segments.join(' ');
 }

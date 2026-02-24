@@ -15,6 +15,7 @@ export async function exportToPng(
     });
     const page = await context.newPage();
     await page.setContent(html, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => (window as any).__roughDone === true, null, { timeout: 10000 }).catch(() => {});
     const buffer = await page.screenshot({ type: 'png', fullPage: false });
     await writeFile(outputPath, buffer);
   } finally {

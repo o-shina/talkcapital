@@ -67,19 +67,21 @@ describe('html-renderer', () => {
     expect(html).not.toContain('<img');
   });
 
-  test('SVGコネクタが含まれる', () => {
+  test('rough.js による手描き風描画が含まれる', () => {
     const html = renderToHtml(sampleStructured as any);
-    expect(html).toContain('<svg');
-    expect(html).toContain('arrowhead');
+    expect(html).toContain('<svg id="rough-canvas"');
+    expect(html).toContain('rough.svg(svg)');
+    expect(html).toContain('rc.rectangle');
+    expect(html).toContain('rc.line');
   });
 
   test('HTMLエスケープが正しく動作する', () => {
     const data = {
       ...sampleStructured,
-      title: 'テスト<script>alert(1)</script>',
+      title: 'テスト<b>太字</b>',
     };
     const html = renderToHtml(data as any);
-    expect(html).not.toContain('<script>');
-    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<b>太字</b>');
+    expect(html).toContain('&lt;b&gt;太字&lt;/b&gt;');
   });
 });

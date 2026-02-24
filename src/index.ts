@@ -11,7 +11,7 @@ program
   .command('generate')
   .requiredOption('-o, --output <path>', '出力ファイルパス')
   .option('-i, --input <path>', '入力音声ファイルパス')
-  .option('--format <format>', '出力形式 (png|excalidraw)', 'png')
+  .option('--format <format>', '出力形式 (png|html)', 'png')
   .option('--skip-transcribe', '文字起こしをスキップ')
   .option('--transcript <path>', '文字起こしテキストファイルパス')
   .option('--scale <number>', '出力スケール（デフォルト:2）', '2')
@@ -23,8 +23,8 @@ program
       if (options.skipTranscribe && !transcriptOverride) {
         throw new Error('--skip-transcribe 時は --transcript が必須です');
       }
-      if (options.format !== 'png' && options.format !== 'excalidraw') {
-        throw new Error('--format は png または excalidraw を指定してください');
+      if (options.format !== 'png' && options.format !== 'html') {
+        throw new Error('--format は png または html を指定してください');
       }
 
       const result = await runPipeline(

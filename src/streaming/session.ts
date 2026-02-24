@@ -3,7 +3,8 @@ import type { Config } from '../config/index.js';
 import { TranscribeStream } from './transcribe-stream.js';
 import { PlaywrightPool } from './playwright-pool.js';
 import { structureTranscript, type StructuringDependencies } from '../services/structuring.js';
-import { renderToExcalidraw } from '../services/template-engine.js';
+import { renderToHtml } from '../services/html-renderer.js';
+import { generateBlockIcons, type IllustrationDependencies } from '../services/illustration.js';
 import {
   interimStructuredContentSchema,
   structuredContentSchema,
@@ -25,6 +26,7 @@ export interface SessionDeps {
   transcribeStream?: TranscribeStream;
   playwrightPool?: PlaywrightPool;
   structuringDeps?: StructuringDependencies;
+  illustrationDeps?: IllustrationDependencies;
 }
 
 const UPDATE_CHAR_THRESHOLD = 500;
@@ -48,6 +50,7 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
   private transcribeStream: TranscribeStream;
   private playwrightPool: PlaywrightPool;
   private structuringDeps: StructuringDependencies;
+  private illustrationDeps: IllustrationDependencies;
 
   private accumulatedText = '';
   private lastStructuredLength = 0;
@@ -62,6 +65,7 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
       deps?.transcribeStream ?? new TranscribeStream(config.aws.region);
     this.playwrightPool = deps?.playwrightPool ?? new PlaywrightPool();
     this.structuringDeps = deps?.structuringDeps ?? {};
+    this.illustrationDeps = deps?.illustrationDeps ?? {};
   }
 
   async start(): Promise<void> {
@@ -109,8 +113,19 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
         this.config,
         this.structuringDeps,
       );
-      const doc = renderToExcalidraw(structured);
-      const png = await this.playwrightPool.exportToPng(doc);
+
+      // 最終版でのみイラスト生成
+      let illustrations: Map<number, string> | undefined;
+      if (this.config.illustration.enabled) {
+        illustrations = await generateBlockIcons(
+          structured,
+          this.config,
+          this.illustrationDeps,
+        );
+      }
+
+      const html = renderToHtml(structured, { illustrations });
+      const png = await this.playwrightPool.renderHtmlToPng(html);
       this.emit('graphic_final', png);
     } catch (err) {
       this.emit(
@@ -142,8 +157,9 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
     try {
       const interim = await this.structureInterim(this.accumulatedText);
       const full = this.interimToStructured(interim);
-      const doc = renderToExcalidraw(full);
-      const png = await this.playwrightPool.exportToPng(doc);
+      // 中間更新ではイラスト生成をスキップ（高速化のため）
+      const html = renderToHtml(full);
+      const png = await this.playwrightPool.renderHtmlToPng(html);
       this.emit('graphic_update', png);
     } catch (err) {
       // 失敗時はロールバックして再試行可能にする
@@ -224,7 +240,7 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
     return interimStructuredContentSchema.parse(toolInput);
   }
 
-  /** interimスキーマの結果を、renderToExcalidraw に渡せる完全な StructuredContent に変換する */
+  /** interimスキーマの結果を、renderToHtml に渡せる完全な StructuredContent に変換する */
   interimToStructured(interim: InterimStructuredContent): StructuredContent {
     // blocks: 3個未満なら空ブロックで補完
     const blocks = [...interim.blocks];

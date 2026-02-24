@@ -18,6 +18,7 @@ export const structuredContentSchema = z.object({
           )
           .min(1)
           .max(3),
+        importance: z.enum(['high', 'medium', 'low']).optional(),
       }),
     )
     .min(3)
@@ -58,6 +59,7 @@ export const interimStructuredContentSchema = z.object({
           )
           .min(1)
           .max(3),
+        importance: z.enum(['high', 'medium', 'low']).optional(),
       }),
     )
     .min(1)
@@ -111,6 +113,10 @@ export function getInterimStructuredContentJsonSchema(): Record<string, unknown>
                 },
                 additionalProperties: false,
               },
+            },
+            importance: {
+              type: 'string',
+              enum: ['high', 'medium', 'low'],
             },
           },
           additionalProperties: false,
@@ -179,6 +185,10 @@ export function getStructuredContentJsonSchema(): Record<string, unknown> {
                 },
                 additionalProperties: false,
               },
+            },
+            importance: {
+              type: 'string',
+              enum: ['high', 'medium', 'low'],
             },
           },
           additionalProperties: false,

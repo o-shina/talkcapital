@@ -41,16 +41,7 @@ export function renderToHtml(
     const ulY = layout.y + 80;
     roughCommands.push(`rc.line(${layout.x + 20}, ${ulY}, ${layout.x + layout.width - 20}, ${ulY}, {stroke:'${color.stroke}', roughness:3, strokeWidth:3, seed:${Math.floor(rand() * 100000)}})`);
 
-    // Bullet markers
-    const block = content.blocks[i];
-    if (block) {
-      const illustOffset = illustrations?.has(i) ? 230 : 0;
-      block.bullets.forEach((_, bIdx) => {
-        const bx = layout.x + 30 + illustOffset;
-        const by = layout.y + 110 + bIdx * 80;
-        roughCommands.push(`rc.circle(${bx + 6}, ${by + 14}, 14, {fill:'${color.stroke}', stroke:'${color.stroke}', fillStyle:'solid', roughness:1.5, strokeWidth:1, seed:${Math.floor(rand() * 100000)}})`);
-      });
-    }
+    // Bullet markers are rendered inline in HTML (not SVG) to align with text flow
   }
 
   // Speech bubbles
@@ -76,11 +67,7 @@ export function renderToHtml(
   // Actions underline
   roughCommands.push(`rc.line(${LAYOUT.actions.x + 20}, ${LAYOUT.actions.y + 60}, ${LAYOUT.actions.x + LAYOUT.actions.width - 20}, ${LAYOUT.actions.y + 60}, {stroke:'${COLORS.actions.stroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
 
-  // Action checkboxes
-  content.actions.forEach((_, idx) => {
-    const ay = LAYOUT.actions.y + 90 + idx * 100;
-    roughCommands.push(`rc.rectangle(${LAYOUT.actions.x + 30}, ${ay}, 34, 34, {stroke:'${COLORS.actions.stroke}', roughness:2, strokeWidth:2, seed:${Math.floor(rand() * 100000)}})`);
-  });
+  // Action checkboxes are rendered inline in HTML (not SVG) to align with text flow
 
   // Connector arrows (hand-drawn)
   const titleEndX = LAYOUT.title.x + LAYOUT.title.width + 10;
@@ -156,14 +143,15 @@ body {
 }
 .block-text {
   position: absolute;
-  padding: 20px 24px;
+  padding: ${LAYOUT.blockHeadingTopInset}px ${LAYOUT.blockBulletRightPadding}px ${LAYOUT.blockHeadingTopInset}px ${LAYOUT.blockBulletLeftPadding}px;
   overflow: hidden;
 }
 .block-heading {
-  font-size: 40px;
+  font-size: ${LAYOUT.blockHeadingFontSize}px;
   font-weight: 600;
-  margin-bottom: 10px;
-  line-height: 1.15;
+  margin-bottom: 12px;
+  line-height: 1.2;
+  padding-bottom: 8px;
 }
 .block-illustration {
   float: left;
@@ -176,13 +164,23 @@ body {
 .block-bullet-list {
   list-style: none;
   padding: 0;
-  margin-top: 16px;
+  margin-top: 8px;
 }
 .block-bullet-list li {
-  font-size: 28px;
-  line-height: 1.6;
-  padding-left: 28px;
-  margin-bottom: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: ${LAYOUT.blockBulletFontSize}px;
+  line-height: 1.7;
+  margin-bottom: 4px;
+}
+.bullet-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 14px;
 }
 .bubble-text {
   position: absolute;
@@ -204,19 +202,29 @@ body {
   padding: 16px 30px;
 }
 .actions-header {
-  font-size: 38px;
+  font-size: ${LAYOUT.actions.headerFontSize}px;
   font-weight: 600;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   line-height: 1.2;
+  padding-bottom: 8px;
 }
 .action-item {
   display: flex;
   align-items: flex-start;
-  gap: 18px;
-  margin-bottom: 22px;
-  font-size: 30px;
+  gap: 14px;
+  margin-bottom: 18px;
+  font-size: ${LAYOUT.actions.itemFontSize}px;
   line-height: 1.4;
-  padding-left: 50px;
+}
+.action-checkbox {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 2.5px solid ${COLORS.actions.stroke};
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  transform: rotate(-1deg);
 }
 </style>
 </head>
@@ -233,12 +241,11 @@ ${content.blocks.map((block, i) => {
   const layout = resolvedBlocks[i];
   const color = COLORS.blocks[i];
   const illust = illustrations?.get(i);
-  const illustOffset = illust ? 230 : 0;
   return `<div class="block-text" style="left:${layout.x}px;top:${layout.y}px;width:${layout.width}px;height:${layout.height}px;">
   <div class="block-heading" style="color:${color.stroke}">${escapeHtml(block.heading)}</div>
   ${illust ? `<img class="block-illustration" src="${illust}" alt="">` : ''}
   <ul class="block-bullet-list">
-    ${block.bullets.map(b => `<li style="padding-left:${28 + illustOffset}px;">${escapeHtml(b.text)}</li>`).join('\n    ')}
+    ${block.bullets.map(b => `<li><span class="bullet-dot" style="background:${color.stroke}"></span>${escapeHtml(b.text)}</li>`).join('\n    ')}
   </ul>
 </div>`;
 }).join('\n')}
@@ -253,7 +260,7 @@ ${content.speechBubbles.map((bubble, i) => {
 
 <div class="actions-text">
   <div class="actions-header">今日からできるアクション</div>
-  ${content.actions.map(action => `<div class="action-item">${escapeHtml(action.text)}</div>`).join('\n  ')}
+  ${content.actions.map(action => `<div class="action-item"><span class="action-checkbox"></span>${escapeHtml(action.text)}</div>`).join('\n  ')}
 </div>
 
 <script>

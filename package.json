@@ -7,7 +7,7 @@
     "talkcapital": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && esbuild export/entry.js --bundle --format=iife --outfile=export/bundle.js --platform=browser --loader:.js=jsx",
+    "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

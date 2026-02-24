@@ -1,0 +1,15 @@
+[Unit]
+Description=TalkCapital Streaming Server
+After=network.target
+
+[Service]
+Type=simple
+User=exedev
+WorkingDirectory=/home/exedev/talkcapital
+ExecStart=/usr/bin/node dist/src/server.js
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=/home/exedev/talkcapital/.env
+
+[Install]
+WantedBy=multi-user.target

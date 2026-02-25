@@ -82,7 +82,7 @@ export async function buildBlockImagePrompts(
   const outputText = extractTextResponse(response.output?.message?.content as unknown[]);
   process.stderr.write(`[prompt-builder] Block prompts raw response:\n${outputText}\n`);
 
-  return parseBlockPromptResponse(outputText, content.blocks.length);
+  return parseBlockPromptResponse(outputText);
 }
 
 function formatBlocksForLLM(content: StructuredContent): string {
@@ -102,7 +102,7 @@ function formatBlocksForLLM(content: StructuredContent): string {
 ${blocks}`;
 }
 
-function parseBlockPromptResponse(text: string, blockCount: number): BlockImagePromptResult[] {
+function parseBlockPromptResponse(text: string): BlockImagePromptResult[] {
   // JSON 配列を抽出（```json ... ``` ブロックまたは直接 JSON）
   const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? text.match(/(\[[\s\S]*\])/);
   if (!jsonMatch) {

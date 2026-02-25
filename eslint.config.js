@@ -5,7 +5,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'export/**', 'vitest.config.ts'],
+    ignores: ['dist/**', 'node_modules/**', 'export/**', 'scripts/**', 'vitest.config.ts'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

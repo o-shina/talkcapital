@@ -53,8 +53,8 @@ export function resolveBlockLayouts(
     const block = content.blocks[i];
     const importance = block?.importance ?? 'medium';
 
-    // 重要度によるサイズスケール
-    const scale = importance === 'high' ? 1.12 : importance === 'low' ? 0.92 : 1.0;
+    // 重要度によるサイズスケール（ギャップ40pxに収まるよう控えめに）
+    const scale = importance === 'high' ? 1.02 : importance === 'low' ? 0.98 : 1.0;
     const width = Math.round(base.width * scale);
     const height = Math.round(base.height * scale);
 
@@ -62,10 +62,10 @@ export function resolveBlockLayouts(
     const dx = Math.round((base.width - width) / 2);
     const dy = Math.round((base.height - height) / 2);
 
-    // 微小ジッター（±4px位置、±0.015rad≈±0.86度回転）
-    const jitterX = Math.round((rand() - 0.5) * 8);
-    const jitterY = Math.round((rand() - 0.5) * 8);
-    const angle = (rand() - 0.5) * 0.03;
+    // 微小ジッター（±2px位置、±0.008rad≈±0.46度回転）
+    const jitterX = Math.round((rand() - 0.5) * 4);
+    const jitterY = Math.round((rand() - 0.5) * 4);
+    const angle = (rand() - 0.5) * 0.016;
 
     return {
       x: base.x + dx + jitterX,

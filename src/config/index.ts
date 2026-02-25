@@ -28,6 +28,7 @@ export interface Config {
   };
   illustration: {
     enabled: boolean;
+    mode: 'icons' | 'zones';
     modelId: string;
     region: string;
     iconSize: number;
@@ -94,6 +95,7 @@ export function loadConfig(): Config {
     },
     illustration: {
       enabled: process.env.ILLUSTRATION_ENABLED !== 'false',
+      mode: (process.env.ILLUSTRATION_MODE ?? 'icons') as 'icons' | 'zones',
       modelId: process.env.BEDROCK_IMAGE_MODEL_ID ?? 'amazon.nova-canvas-v1:0',
       region: process.env.BEDROCK_IMAGE_REGION ?? 'us-east-1',
       iconSize: Number(process.env.ILLUSTRATION_ICON_SIZE ?? '100'),

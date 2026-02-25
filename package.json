@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "start": "node dist/src/index.js",
     "prepare": "playwright install chromium",
-    "serve": "node dist/src/server.js"
+    "serve": "node dist/src/server.js",
+    "compare-models": "npx tsx scripts/compare-models.ts"
   },
   "engines": {
     "node": ">=18"

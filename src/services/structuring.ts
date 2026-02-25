@@ -172,4 +172,10 @@ const SYSTEM_PROMPT = `あなたは講演の内容をグラフィックレコー
 7. actionsは必ず3個（「今日からできる」具体的アクション）
 8. 専門用語は講演で使われていた表現をそのまま使用
 9. 情報を詰め込みすぎない。余白を意識し、重要度の高い内容のみ抽出
-10. 各blockにimportanceを付与する。講演で最も強調・時間を割いていたテーマを"high"、補足的なテーマを"low"、その他を"medium"とする。highは最大1個`;
+10. 各blockにimportanceを付与する。講演で最も強調・時間を割いていたテーマを"high"、補足的なテーマを"low"、その他を"medium"とする。highは最大1個
+11. 各blockにrelationToNextを付与する（最後のblockは除く）。次のブロックとの関係性:
+    - "causes": このトピックが次の原因・前提
+    - "contrasts": 次と対比的
+    - "supports": 次を補強
+    - "builds-on": 次がこのトピックの発展
+    - "independent": 特に関係なし`;

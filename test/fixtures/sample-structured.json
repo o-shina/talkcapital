@@ -8,7 +8,9 @@
         { "text": "対人リスクを取れる環境" },
         { "text": "発言しやすさが成果を左右" },
         { "text": "沈黙は危険信号" }
-      ]
+      ],
+      "importance": "high",
+      "relationToNext": "causes"
     },
     {
       "heading": "リーダーの役割",
@@ -16,7 +18,9 @@
         { "text": "失敗を先に共有する" },
         { "text": "質問を歓迎する" },
         { "text": "感謝を言葉で伝える" }
-      ]
+      ],
+      "importance": "medium",
+      "relationToNext": "builds-on"
     },
     {
       "heading": "実践のポイント",

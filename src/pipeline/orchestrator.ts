@@ -5,7 +5,8 @@ import { transcribeAudio } from '../services/transcription.js';
 import { structureTranscript } from '../services/structuring.js';
 import { renderToHtml } from '../services/html-renderer.js';
 import { exportToPng } from '../services/exporter.js';
-import { generateBlockIcons } from '../services/illustration.js';
+import { generateBlockIcons, generateZoneImages } from '../services/illustration.js';
+import { buildBlockImagePrompts } from '../services/prompt-builder.js';
 import type { StructuredContent } from '../types/structured-content.js';
 
 export interface PipelineOptions {
@@ -48,20 +49,29 @@ export async function runPipeline(options: PipelineOptions, config: Config): Pro
   const structured = await structureTranscript(transcript, config);
   timings.structuring = Date.now() - structureStarted;
 
-  // アイコン生成（有効時のみ）
+  // イラスト生成（有効時のみ）
   let illustrations: Map<number, string> | undefined;
+  let zoneImages: Map<number, string> | undefined;
   if (config.illustration.enabled) {
-    logStage('[3/5] アイコン生成中...');
-    const illustrationStarted = Date.now();
-    illustrations = await generateBlockIcons(structured, config);
-    timings.illustration = Date.now() - illustrationStarted;
+    if (config.illustration.mode === 'zones') {
+      logStage('[3/5] ゾーン画像生成中...');
+      const illustrationStarted = Date.now();
+      const blockPrompts = await buildBlockImagePrompts(structured, config);
+      zoneImages = await generateZoneImages(blockPrompts, config);
+      timings.illustration = Date.now() - illustrationStarted;
+    } else {
+      logStage('[3/5] アイコン生成中...');
+      const illustrationStarted = Date.now();
+      illustrations = await generateBlockIcons(structured, config);
+      timings.illustration = Date.now() - illustrationStarted;
+    }
   } else {
-    logStage('[3/5] アイコン生成スキップ');
+    logStage('[3/5] イラスト生成スキップ');
   }
 
   logStage('[4/5] HTML描画中...');
   const templateStarted = Date.now();
-  const html = renderToHtml(structured, { illustrations });
+  const html = renderToHtml(structured, { illustrations, zoneImages });
   timings.template = Date.now() - templateStarted;
 
   const outputFormat = options.outputFormat ?? 'png';

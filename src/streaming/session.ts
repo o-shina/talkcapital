@@ -4,7 +4,8 @@ import { TranscribeStream } from './transcribe-stream.js';
 import { PlaywrightPool } from './playwright-pool.js';
 import { structureTranscript, type StructuringDependencies } from '../services/structuring.js';
 import { renderToHtml } from '../services/html-renderer.js';
-import { generateBlockIcons, type IllustrationDependencies } from '../services/illustration.js';
+import { generateBlockIcons, generateZoneImages, type IllustrationDependencies } from '../services/illustration.js';
+import { buildBlockImagePrompts } from '../services/prompt-builder.js';
 import {
   interimStructuredContentSchema,
   structuredContentSchema,
@@ -116,15 +117,21 @@ export class StreamingSession extends EventEmitter<SessionEvents> {
 
       // 最終版でのみイラスト生成
       let illustrations: Map<number, string> | undefined;
+      let zoneImages: Map<number, string> | undefined;
       if (this.config.illustration.enabled) {
-        illustrations = await generateBlockIcons(
-          structured,
-          this.config,
-          this.illustrationDeps,
-        );
+        if (this.config.illustration.mode === 'zones') {
+          const blockPrompts = await buildBlockImagePrompts(structured, this.config);
+          zoneImages = await generateZoneImages(blockPrompts, this.config, this.illustrationDeps);
+        } else {
+          illustrations = await generateBlockIcons(
+            structured,
+            this.config,
+            this.illustrationDeps,
+          );
+        }
       }
 
-      const html = renderToHtml(structured, { illustrations });
+      const html = renderToHtml(structured, { illustrations, zoneImages });
       const png = await this.playwrightPool.renderHtmlToPng(html);
       this.emit('graphic_final', png);
     } catch (err) {
